@@ -94,6 +94,23 @@ fn validate_workspace_icon(icon: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// Whether `sender_role` may set the workspace profile (kind:9033).
+///
+/// Closed relays (`membership_enforced == true`) require an `admin`/`owner`
+/// row in `relay_members` — the enforced roster is the authority. Open relays
+/// enforce no roster at all: nobody holds a role, so requiring one makes the
+/// icon permanently unsettable — the desktop deliberately shows the icon
+/// editor there (see `canEditCommunityProfile`, #2640) and defers to this
+/// relay-side check, which used to always say no. Any authenticated member of
+/// an open relay may set the icon, mirroring how open relays gate every other
+/// write (NIP-42 auth, no membership).
+fn may_set_workspace_profile(sender_role: &str, membership_enforced: bool) -> bool {
+    if !membership_enforced {
+        return true;
+    }
+    sender_role == "admin" || sender_role == "owner"
+}
+
 /// A relay-admin command failure, carrying the *category* of the failure so
 /// the ingest seam can map it to the right NIP-01 prefix and HTTP status.
 ///
@@ -230,7 +247,7 @@ async fn execute_relay_admin_command(
     // kind:9033 — Set workspace profile (icon). Handled before p-tag
     // extraction: it targets the relay itself, not a member pubkey.
     if kind == RELAY_ADMIN_SET_WORKSPACE_PROFILE {
-        if sender_role != "admin" && sender_role != "owner" {
+        if !may_set_workspace_profile(sender_role, state.config.require_relay_membership) {
             return Err("actor not authorized: must be admin or owner".to_string());
         }
 
@@ -560,6 +577,29 @@ mod tests {
     #[test]
     fn workspace_icon_empty_ok() {
         assert!(validate_workspace_icon("").is_ok());
+    }
+
+    /// Closed relay (membership enforced): only an admin/owner row in
+    /// `relay_members` may set the workspace profile — a plain member, or a
+    /// pubkey with no row at all (empty role), must be refused.
+    #[test]
+    fn closed_relay_requires_admin_or_owner_for_workspace_profile() {
+        assert!(may_set_workspace_profile("owner", true));
+        assert!(may_set_workspace_profile("admin", true));
+        assert!(!may_set_workspace_profile("member", true));
+        assert!(!may_set_workspace_profile("", true));
+    }
+
+    /// Open relay (no membership enforcement): there is no enforced roster to
+    /// hold a role, so any authenticated sender may set the icon — including
+    /// the roleless (empty role) case, which is *every* sender on an open
+    /// relay. This is the bug being fixed: the desktop shows the icon editor
+    /// on open relays (#2640) but the relay refused every 9033.
+    #[test]
+    fn open_relay_admits_any_authenticated_sender_for_workspace_profile() {
+        assert!(may_set_workspace_profile("", false));
+        assert!(may_set_workspace_profile("member", false));
+        assert!(may_set_workspace_profile("owner", false));
     }
 
     #[test]
