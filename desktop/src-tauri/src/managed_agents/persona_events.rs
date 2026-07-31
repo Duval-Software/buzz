@@ -492,6 +492,15 @@ pub fn apply_persona_snapshot(record: &mut ManagedAgentRecord, persona: &AgentDe
         .env_vars
         .retain(|k, v| persona.env_vars.get(k) != Some(v));
     record.persona_source_version = Some(snapshot.source_version);
+
+    // After all persona fields (including runtime) have been applied, normalize
+    // the instance parallelism to the harness cap for the newly resolved command.
+    // Pass the persona as the definition slice so records with runtime: None
+    // (cleared by an "inherit from persona" update) resolve the live persona
+    // runtime instead of falling back to a stale `record.agent_command`.
+    let effective_cmd =
+        crate::managed_agents::record_agent_command(record, std::slice::from_ref(persona));
+    crate::managed_agents::normalize_instance_parallelism(record, &effective_cmd);
 }
 
 /// Preview what `record` would look like immediately after the start/restore

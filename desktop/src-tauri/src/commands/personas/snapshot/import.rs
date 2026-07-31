@@ -198,6 +198,26 @@ pub(crate) fn resolve_snapshot_import_behavior(
 
 const PNG_MAGIC: [u8; 4] = [0x89, 0x50, 0x4e, 0x47];
 
+/// Compute the effective instance parallelism for an individual snapshot import.
+///
+/// This is the single production seam for the parallelism cap in individual
+/// imports. Both the import command ([`confirm_agent_snapshot_import`]) and
+/// tests call this function — removing or changing the cap logic here breaks
+/// both.
+///
+/// The runtime id is resolved via the three-tier lookup
+/// (static builtins → static preset list → loaded registry), so preset
+/// harnesses (e.g. openclaw) resolve correctly even with a cold registry.
+pub(crate) fn snapshot_instance_parallelism(
+    snapshot_runtime: Option<&str>,
+    minted_parallelism: Option<u32>,
+) -> u32 {
+    crate::managed_agents::effective_instance_parallelism(
+        snapshot_runtime,
+        minted_parallelism.unwrap_or(crate::managed_agents::DEFAULT_AGENT_PARALLELISM),
+    )
+}
+
 /// Decode a `buzz-agent-snapshot v1` manifest from raw bytes.
 ///
 /// Sniffs by magic bytes (PNG signature) first, then falls back to JSON.
@@ -499,8 +519,15 @@ pub async fn confirm_agent_snapshot_import(
             turn_timeout_seconds: 0,
             idle_timeout_seconds: snapshot.definition.idle_timeout_seconds,
             max_turn_duration_seconds: snapshot.definition.max_turn_duration_seconds,
-            parallelism: minted_parallelism
-                .unwrap_or(crate::managed_agents::DEFAULT_AGENT_PARALLELISM),
+            parallelism: {
+                // Effective instance parallelism via the shared production seam.
+                // Tested directly via `snapshot_instance_parallelism`; removing
+                // this call breaks both production and the import regression test.
+                snapshot_instance_parallelism(
+                    snapshot.definition.runtime.as_deref(),
+                    minted_parallelism,
+                )
+            },
             system_prompt: snapshot.definition.system_prompt.clone(),
             model: snapshot.definition.model.clone(),
             provider: snapshot.definition.provider.clone(),
@@ -649,7 +676,12 @@ fn retain_agent_pending(app: &AppHandle, state: &AppState, record: &ManagedAgent
     let result = (|| -> Result<(), String> {
         let scope = crate::managed_agents::retention::active_retention_scope(app, state)?;
         let conn = open_retention_db(&scope.db_path)?;
-        let content = serde_json::to_string(&agent_event_content(record))
+        // Load the live persona slice so persona-inherited records project
+        // the live persona runtime into kind:30177 rather than the stale
+        // agent_command field. Best-effort: errors produce an empty slice.
+        let personas = crate::managed_agents::load_personas(app).unwrap_or_default();
+        let effective_cmd = crate::managed_agents::record_agent_command(record, &personas);
+        let content = serde_json::to_string(&agent_event_content(record, &effective_cmd))
             .map_err(|e| format!("failed to serialize agent content: {e}"))?;
         let (owner_pubkey, event) = {
             let keys = &scope.owner_keys;
@@ -659,7 +691,7 @@ fn retain_agent_pending(app: &AppHandle, state: &AppState, record: &ManagedAgent
             if existing.as_ref().is_some_and(|row| row.content == content) {
                 return Ok(());
             }
-            let event = build_agent_event(record)?
+            let event = build_agent_event(record, &personas)?
                 .custom_created_at(monotonic_created_at(existing.map(|row| row.created_at)))
                 .sign_with_keys(keys)
                 .map_err(|e| format!("failed to sign agent event: {e}"))?;
@@ -878,5 +910,53 @@ mod import_avatar_tests {
             .await;
 
         assert_eq!(result.unwrap_err(), "Snapshot avatar data is malformed.");
+    }
+}
+
+// ── Individual snapshot import: OpenClaw parallelism contract ────────────────
+
+#[cfg(test)]
+mod openclaw_parallelism_tests {
+    /// `resolve_snapshot_import_behavior` returns the REQUESTED parallelism
+    /// from the snapshot unchanged — the cap is applied only when constructing
+    /// the instance record inside `confirm_agent_snapshot_import`.
+    #[test]
+    fn individual_import_openclaw_definition_stores_requested_parallelism() {
+        let behavior = super::resolve_snapshot_import_behavior(
+            Some("owner-only"),
+            &[],
+            Some(10), // requested value above the OpenClaw cap
+            false,
+        )
+        .expect("resolve_snapshot_import_behavior must succeed");
+
+        assert_eq!(
+            behavior.parallelism,
+            Some(10),
+            "individual import: behavior.parallelism (used as definition requested value) must be 10 (not clamped)"
+        );
+    }
+
+    /// The instance parallelism path in `confirm_agent_snapshot_import` calls
+    /// `snapshot_instance_parallelism(runtime_id, requested)`. This test drives
+    /// that shared production seam — removing or changing it fails this test.
+    #[test]
+    fn individual_import_openclaw_instance_parallelism_is_capped() {
+        assert_eq!(
+            super::snapshot_instance_parallelism(Some("openclaw"), Some(10)),
+            crate::managed_agents::OPENCLAW_MAX_PARALLELISM,
+            "individual import: OpenClaw instance parallelism must be capped at {}",
+            crate::managed_agents::OPENCLAW_MAX_PARALLELISM
+        );
+    }
+
+    /// Non-OpenClaw harnesses pass through unchanged via snapshot_instance_parallelism.
+    #[test]
+    fn individual_import_goose_instance_parallelism_is_not_capped() {
+        assert_eq!(
+            super::snapshot_instance_parallelism(Some("goose"), Some(10)),
+            10,
+            "goose individual import: parallelism 10 must not be capped"
+        );
     }
 }

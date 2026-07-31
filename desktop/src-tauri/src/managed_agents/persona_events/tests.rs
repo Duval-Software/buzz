@@ -937,3 +937,61 @@ mod flush_barrier {
         );
     }
 }
+
+// ── apply_persona_snapshot parallelism normalization ──────────────────────────
+
+#[test]
+fn apply_persona_snapshot_normalizes_openclaw_parallelism() {
+    let mut record = sample_record();
+    record.parallelism = 10;
+    let persona = AgentDefinition {
+        runtime: Some("openclaw".into()),
+        ..sample_persona()
+    };
+    apply_persona_snapshot(&mut record, &persona);
+    assert_eq!(
+        record.parallelism,
+        crate::managed_agents::OPENCLAW_MAX_PARALLELISM
+    );
+}
+
+/// Persona runtime=None, stale record.agent_command="openclaw": applying the
+/// snapshot must NOT cap because record_agent_command resolves the persona's
+/// live runtime (None → default) rather than the stale agent_command.
+/// Regression for the policy_command_for_record → record_agent_command fix.
+#[test]
+fn apply_persona_snapshot_persona_runtime_none_stale_openclaw_not_capped() {
+    let mut record = sample_record();
+    record.agent_command = "openclaw".to_string(); // stale from before inherit
+    record.parallelism = 10;
+    // persona.runtime = None means the persona carries no harness id.
+    let persona = AgentDefinition {
+        runtime: None,
+        ..sample_persona()
+    };
+    apply_persona_snapshot(&mut record, &persona);
+    // record.runtime is now None (from snapshot); record_agent_command
+    // falls back to default_agent_command (uncapped), not stale "openclaw".
+    assert_eq!(
+        record.parallelism, 10,
+        "persona runtime=None must not cap via stale agent_command"
+    );
+}
+
+/// Inverse: persona runtime=None, stale agent_command="goose": cap must not
+/// apply (same default-command fallback; goose is uncapped anyway).
+#[test]
+fn apply_persona_snapshot_persona_runtime_none_stale_goose_not_capped() {
+    let mut record = sample_record();
+    record.agent_command = "goose".to_string();
+    record.parallelism = 10;
+    let persona = AgentDefinition {
+        runtime: None,
+        ..sample_persona()
+    };
+    apply_persona_snapshot(&mut record, &persona);
+    assert_eq!(
+        record.parallelism, 10,
+        "persona runtime=None + stale goose must not cap"
+    );
+}
