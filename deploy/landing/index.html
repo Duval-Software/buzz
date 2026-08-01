@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Join the Duval Software Workspace</title>
+<meta name="description" content="Install Buzz and join the Duval Software team workspace at chat.duvalsoftware.com.">
+<meta name="robots" content="noindex">
+<link rel="icon" href="/duval.png">
+<style>
+  :root{
+    --beige:#e6e1d3;
+    --driftwood:#f4f1ea;
+    --ink:#101820;
+    --teal:#006777;
+    --gold:#d5a029;
+    --muted:#10182099;
+    --line:#00677733;
+    --radius:12px;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0;
+    background:var(--beige);
+    color:var(--ink);
+    font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+    line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:940px;margin:0 auto;padding:56px 24px 72px}
+  header{text-align:center;margin-bottom:44px}
+  header img{width:min(420px,90%);height:auto}
+  .pill{
+    display:inline-flex;align-items:center;gap:9px;
+    background:#0067771a;border-radius:999px;
+    padding:7px 18px;margin-bottom:22px;
+    font-size:12px;font-weight:700;letter-spacing:1.6px;
+    text-transform:uppercase;color:var(--teal);
+  }
+  .pill::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--gold)}
+  h1{
+    font-size:clamp(32px,6vw,56px);font-weight:700;
+    line-height:1.08;letter-spacing:-.02em;margin:0 0 18px;
+  }
+  h1 .accent{color:var(--teal)}
+  .lede{font-size:clamp(17px,2.4vw,20px);color:var(--muted);max-width:62ch;margin:0 auto}
+  .hero{text-align:center;margin-bottom:56px}
+
+  .step{
+    background:var(--driftwood);border:1px solid var(--line);
+    border-radius:var(--radius);padding:26px 28px;margin-bottom:20px;
+  }
+  .step-no{
+    font-size:13px;font-weight:700;letter-spacing:1.4px;
+    text-transform:uppercase;color:var(--teal);margin-bottom:8px;
+  }
+  .step h2{font-size:clamp(20px,3vw,25px);font-weight:600;margin:0 0 10px;letter-spacing:-.01em}
+  .step p{margin:0 0 16px;color:var(--muted)}
+  .step p:last-child{margin-bottom:0}
+
+  .btns{display:flex;flex-wrap:wrap;gap:10px;margin-top:4px}
+  .btn{
+    display:inline-flex;align-items:center;gap:8px;
+    background:var(--teal);color:#fff;text-decoration:none;
+    padding:13px 22px;border-radius:var(--radius);
+    font-size:14px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;
+    border:1px solid var(--teal);transition:opacity .15s ease;
+  }
+  .btn:hover{opacity:.88}
+  .btn.ghost{background:transparent;color:var(--ink);border-color:var(--line)}
+  .btn.ghost:hover{background:#00677710;opacity:1}
+
+  .urlrow{display:flex;flex-wrap:wrap;gap:10px;align-items:stretch}
+  code.url{
+    flex:1 1 320px;display:flex;align-items:center;
+    background:#fff;border:1px solid var(--line);border-radius:var(--radius);
+    padding:14px 18px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+    font-size:clamp(14px,2.2vw,17px);color:var(--ink);
+    overflow-x:auto;white-space:nowrap;
+  }
+  #copy{cursor:pointer;font-family:inherit;flex:0 0 auto}
+
+  .note{
+    display:flex;gap:12px;align-items:flex-start;
+    border-left:3px solid var(--gold);background:#d5a02914;
+    border-radius:0 var(--radius) var(--radius) 0;
+    padding:15px 18px;margin-top:18px;font-size:15px;color:var(--ink);
+  }
+  .note strong{font-weight:700}
+
+  footer{
+    margin-top:48px;padding-top:26px;border-top:1px solid var(--line);
+    text-align:center;font-size:14px;color:var(--muted);
+  }
+  footer a{color:var(--teal);text-decoration:none;font-weight:600}
+  footer a:hover{text-decoration:underline}
+  .small{font-size:13.5px;color:var(--muted);margin-top:14px}
+  .small a{color:var(--teal)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <img src="/duval.png" alt="Duval Software">
+  </header>
+
+  <div class="hero">
+    <div class="pill">Private team workspace</div>
+    <h1>Join the <span class="accent">Duval Software</span> workspace</h1>
+    <p class="lede">
+      This is our team chat — messages, projects, code, and AI agents in one place,
+      running on our own server. Membership is invite-only. Three steps and you're in.
+    </p>
+  </div>
+
+  <section class="step">
+    <div class="step-no">01 — Install the app</div>
+    <h2>Download Buzz for your machine</h2>
+    <p>Buzz is a desktop app for macOS, Windows, and Linux. Pick your platform:</p>
+    <div class="btns">
+      <a class="btn" href="https://github.com/block/buzz/releases/download/desktop-v0.5.3/Buzz_0.5.3_aarch64.dmg">macOS · Apple Silicon</a>
+      <a class="btn ghost" href="https://github.com/block/buzz/releases/download/desktop-v0.5.3/Buzz_0.5.3_x64.dmg">macOS · Intel</a>
+      <a class="btn ghost" href="https://github.com/block/buzz/releases/download/desktop-v0.5.3/Buzz_0.5.3_x64-setup_alpha-unsigned.exe">Windows</a>
+      <a class="btn ghost" href="https://github.com/block/buzz/releases/download/desktop-v0.5.3/Buzz_0.5.3_amd64.AppImage">Linux · AppImage</a>
+      <a class="btn ghost" href="https://github.com/block/buzz/releases/download/desktop-v0.5.3/Buzz_0.5.3_amd64.deb">Linux · .deb</a>
+    </div>
+    <div class="note">
+      <span>
+        <strong>On macOS,</strong> if you see “Buzz can’t be opened because it is from an
+        unidentified developer,” right-click the app in Applications and choose <strong>Open</strong>.
+        You only need to do this once.
+      </span>
+    </div>
+    <p class="small">Version 0.5.3 · <a href="https://github.com/block/buzz/releases/latest">See all releases</a></p>
+  </section>
+
+  <section class="step">
+    <div class="step-no">02 — Connect</div>
+    <h2>Join our community</h2>
+    <p>Open Buzz, choose <strong>Join a community</strong>, and enter this address:</p>
+    <div class="urlrow">
+      <code class="url" id="relay">wss://chat.duvalsoftware.com</code>
+      <button class="btn" id="copy" type="button" aria-label="Copy workspace address">Copy</button>
+    </div>
+    <p class="small">
+      Buzz will create a private key that becomes your identity — there is no username or password.
+      Back it up somewhere safe, like a password manager. If you lose it, you lose access.
+    </p>
+  </section>
+
+  <section class="step">
+    <div class="step-no">03 — Get approved</div>
+    <h2>Ask for access</h2>
+    <p>
+      Our workspace is closed, so a member has to let you in. Send your public key
+      (the <code>npub…</code> string Buzz shows in your profile) to Lucas, and you'll be
+      admitted. Once you're in, you'll see the channels you've been added to.
+    </p>
+    <div class="note">
+      <span>
+        <strong>Got an invite link?</strong> Open it and it will walk you through the same
+        steps automatically — no need to send your key separately.
+      </span>
+    </div>
+  </section>
+
+  <footer>
+    Duval Software · Homegrown code. Global impact.<br>
+    <a href="https://duvalsoftware.com">duvalsoftware.com</a>
+  </footer>
+
+</div>
+
+<script>
+  document.getElementById('copy').addEventListener('click', async function () {
+    var text = document.getElementById('relay').textContent.trim();
+    var btn = this;
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch (e) {
+      var r = document.createRange();
+      r.selectNode(document.getElementById('relay'));
+      window.getSelection().removeAllRanges();
+      window.getSelection().addRange(r);
+      return;
+    }
+    var original = btn.textContent;
+    btn.textContent = 'Copied';
+    setTimeout(function () { btn.textContent = original; }, 1600);
+  });
+</script>
+</body>
+</html>
