@@ -126,7 +126,10 @@ jobs:
             echo "## Upstream digest — $(date -u +%Y-%m-%d)"
             echo
             echo "**${n_commits} commit(s)** from **${n_authors} author(s)**, touching **${files_changed} file(s)**."
-            echo "[Full compare](https://github.com/${UPSTREAM}/compare/${before}...${after})"
+            # Compare against our own repo: after a sync, main carries commits
+            # (like this workflow) that do not exist upstream, so an upstream
+            # compare URL would 404.
+            echo "[Full compare](https://github.com/${GITHUB_REPOSITORY}/compare/${before}...${after})"
             echo
 
             if [ -s overlap.txt ]; then
