@@ -1,5 +1,42 @@
-{$BUZZ_DOMAIN} {
+# Canonical community URL: relay protocol + web surfaces on one hostname.
+# handle blocks are mutually exclusive and evaluated in order, so the SPA's
+# try_files rewrite never touches requests destined for the relay.
+{$BUZZ_APP_DOMAIN} {
   encode zstd gzip
 
+  # Nostr relay WebSocket — the workspace itself, served from "/".
+  @relay_ws {
+    header Connection *Upgrade*
+    header Upgrade    websocket
+  }
+  handle @relay_ws {
+    reverse_proxy relay:3000
+  }
+
+  # NIP-11 relay info document, also on "/" via content negotiation.
+  @relay_nip11 header Accept *application/nostr+json*
+  handle @relay_nip11 {
+    reverse_proxy relay:3000
+  }
+
+  # Relay REST surface. Disjoint from the web bundle (/, /invite/*, /repos/*).
+  @relay_api path /api/* /count /deliver /events /feedback /feedback/* \
+    /git/* /health /hooks/* /info /internal/* /_liveness /media/* \
+    /_mesh /_mesh/* /moderation/* /query /_readiness /reports /reports/* \
+    /_status /upload /.well-known/*
+  handle @relay_api {
+    reverse_proxy relay:3000
+  }
+
+  handle {
+    root * /srv/app
+    try_files {path} /index.html
+    file_server
+  }
+}
+
+# Plain relay alias.
+{$BUZZ_DOMAIN} {
+  encode zstd gzip
   reverse_proxy relay:3000
 }
