@@ -4,6 +4,12 @@
 {$BUZZ_APP_DOMAIN} {
   encode zstd gzip
 
+  # Device pairing (QR). Separate buzz-pair-relay service, which accepts the
+  # upgrade on any path. Must precede @relay_ws, which would otherwise swallow it.
+  handle /pair* {
+    reverse_proxy pair-relay:5000
+  }
+
   # Nostr relay WebSocket — the workspace itself, served from "/".
   @relay_ws {
     header Connection *Upgrade*
