@@ -43,8 +43,11 @@
   }
 }
 
-# Plain relay alias.
+# Relay alias. Rewrites Host to the canonical name so connecting here joins the
+# same community instead of spawning a second one.
 {$BUZZ_DOMAIN} {
   encode zstd gzip
-  reverse_proxy relay:3000
+  reverse_proxy relay:3000 {
+    header_up Host {$BUZZ_APP_DOMAIN}
+  }
 }
