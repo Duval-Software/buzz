@@ -1,13 +1,18 @@
 name: Watch upstream
 
-# Keeps main a clean mirror of block/buzz and tells us when an upstream change
-# actually needs our attention. It never rewrites duval-deploy, so the running
-# server's clone is never invalidated by automation.
+# Daily digest of what landed in block/buzz, plus alerts when a change actually
+# needs our attention. Keeps main in sync with upstream but never rewrites
+# duval-deploy, so the running server's clone is never invalidated.
 
 on:
   schedule:
-    - cron: "0 13 * * 1" # Mondays 13:00 UTC (~9am ET)
+    - cron: "30 13 * * *" # 09:30 America/New_York while EDT (08:30 during EST)
   workflow_dispatch:
+    inputs:
+      lookback:
+        description: "Report on the last N upstream commits regardless of sync state (leave blank for the normal daily diff)"
+        required: false
+        default: ""
 
 permissions:
   contents: write
@@ -17,6 +22,7 @@ env:
   GH_TOKEN: ${{ github.token }}
   OVERLAY_BRANCH: duval-deploy
   UPSTREAM: block/buzz
+  DIGEST_ISSUE_TITLE: "Upstream digest — block/buzz"
 
 jobs:
   watch:
@@ -26,7 +32,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Fast-forward main from upstream
+      - name: Sync main from upstream
         id: sync
         run: |
           set -euo pipefail
@@ -40,67 +46,127 @@ jobs:
           } >> "$GITHUB_OUTPUT"
           if [ "$before" = "$after" ]; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
-            echo "main already up to date at $after"
           else
             echo "changed=true" >> "$GITHUB_OUTPUT"
-            echo "main advanced: $before -> $after"
           fi
 
-      - name: Flag upstream edits that collide with our deploy overlay
-        if: steps.sync.outputs.changed == 'true'
+      - name: Build the digest
+        id: digest
         run: |
           set -euo pipefail
+          before="${{ steps.sync.outputs.before }}"
+          after="${{ steps.sync.outputs.after }}"
+          changed="${{ steps.sync.outputs.changed }}"
+
+          # Manual runs may ask for a fixed lookback window instead.
+          lookback="${{ github.event.inputs.lookback }}"
+          if [ -n "$lookback" ]; then
+            before="$(git rev-parse "${after}~${lookback}")"
+            changed=true
+            echo "Manual lookback of ${lookback} commit(s): ${before}..${after}"
+          fi
+
+          if [ "$changed" != "true" ]; then
+            {
+              echo "## Upstream digest — $(date -u +%Y-%m-%d)"
+              echo
+              echo "No new commits in \`${UPSTREAM}\` since the last check."
+            } > digest.md
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+            cat digest.md >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          echo "has_changes=true" >> "$GITHUB_OUTPUT"
+
           git fetch -q origin "$OVERLAY_BRANCH"
 
-          # Files our overlay modifies, relative to where it branched off.
+          n_commits="$(git rev-list --count "$before".."$after")"
+          n_authors="$(git log --format='%an' "$before".."$after" | sort -u | wc -l | tr -d ' ')"
+          files_changed="$(git diff --name-only "$before".."$after" | wc -l | tr -d ' ')"
+
+          # Which of the changed files does our deploy overlay also patch?
           base="$(git merge-base origin/main "origin/${OVERLAY_BRANCH}")"
           git diff --name-only "$base".."origin/${OVERLAY_BRANCH}" | sort -u > ours.txt
-
-          # Files upstream touched in this sync window.
-          git diff --name-only \
-            "${{ steps.sync.outputs.before }}".."${{ steps.sync.outputs.after }}" \
-            | sort -u > theirs.txt
-
+          git diff --name-only "$before".."$after" | sort -u > theirs.txt
           comm -12 ours.txt theirs.txt > overlap.txt
-          n_commits="$(git rev-list --count \
-            "${{ steps.sync.outputs.before }}".."${{ steps.sync.outputs.after }}")"
 
-          if [ ! -s overlap.txt ]; then
-            echo "main advanced by ${n_commits} commit(s); none touched our overlay files."
-            exit 0
-          fi
+          # Group commit subjects by conventional-commit type.
+          git log --no-merges --format='%s' "$before".."$after" > subjects.txt
 
-          title="Upstream changed files our deploy overlay patches"
-          if gh issue list --state open --search "\"${title}\" in:title" \
-               --json title -q '.[].title' | grep -qxF "$title"; then
-            echo "Issue already open; not duplicating."
-            exit 0
-          fi
+          TYPES='feat|fix|perf|refactor|style|docs|chore|ci|build|test'
+
+          render () {  # $1 = heading, stdin = matching subjects
+            local heading="$1" matches total
+            matches="$(cat)"
+            if [ -z "$matches" ]; then
+              return 0
+            fi
+            echo "### ${heading}"
+            printf '%s\n' "$matches" | head -25 | while IFS= read -r line; do
+              pr="$(printf '%s' "$line" | grep -oE '\(#[0-9]+\)$' | tr -d '(#)' || true)"
+              text="$(printf '%s' "$line" | sed -E 's/ *\(#[0-9]+\)$//')"
+              if [ -n "$pr" ]; then
+                echo "- ${text} ([#${pr}](https://github.com/${UPSTREAM}/pull/${pr}))"
+              else
+                echo "- ${text}"
+              fi
+            done
+            total="$(printf '%s\n' "$matches" | wc -l | tr -d ' ')"
+            if [ "$total" -gt 25 ]; then
+              echo "- _…and $((total - 25)) more_"
+            fi
+            echo
+          }
+
+          section () {  # $1 = type regex, $2 = heading
+            { grep -iE "^($1)(\(.+\))?!?:" subjects.txt || true; } | render "$2"
+          }
 
           {
-            echo "Upstream advanced by **${n_commits} commit(s)** and touched files that"
-            echo "\`${OVERLAY_BRANCH}\` also modifies. Rebase and re-test before deploying."
+            echo "## Upstream digest — $(date -u +%Y-%m-%d)"
             echo
-            echo "### Overlapping files"
-            sed 's/^/- `/; s/$/`/' overlap.txt
+            echo "**${n_commits} commit(s)** from **${n_authors} author(s)**, touching **${files_changed} file(s)**."
+            echo "[Full compare](https://github.com/${UPSTREAM}/compare/${before}...${after})"
             echo
-            echo "### Compare"
-            echo "https://github.com/${UPSTREAM}/compare/${{ steps.sync.outputs.before }}...${{ steps.sync.outputs.after }}"
-            echo
-            echo "### To reconcile"
-            echo '```bash'
-            echo "git fetch origin"
-            echo "git checkout ${OVERLAY_BRANCH}"
-            echo "git rebase origin/main    # resolve, then re-run the stack and verify"
-            echo '```'
-            echo
-            echo "_Opened automatically by the Watch upstream workflow._"
-          } > body.md
 
-          gh issue create --title "$title" --body-file body.md
-          echo "Opened issue for $(wc -l < overlap.txt) overlapping file(s)."
+            if [ -s overlap.txt ]; then
+              echo "> [!WARNING]"
+              echo "> Upstream changed files our \`${OVERLAY_BRANCH}\` overlay also patches."
+              echo "> Rebase and re-test the stack before deploying:"
+              sed 's/^/> - `/; s/$/`/' overlap.txt
+              echo
+            fi
 
-      - name: Flag a new Buzz release if the landing page is pinned to an older one
+            section 'feat' 'Features'
+            section 'fix' 'Fixes'
+            section 'perf' 'Performance'
+            section 'refactor|style' 'Refactoring'
+            section 'docs|chore|ci|build|test' 'Docs, chores & CI'
+            # Anything not using a conventional-commit prefix.
+            { grep -ivE "^(${TYPES})(\(.+\))?!?:" subjects.txt || true; } | render 'Other'
+          } > digest.md
+
+          cat digest.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Post the digest to the rolling issue
+        if: steps.digest.outputs.has_changes == 'true'
+        run: |
+          set -euo pipefail
+          num="$(gh issue list --state open --search "\"${DIGEST_ISSUE_TITLE}\" in:title" \
+                   --json number,title -q \
+                   "[.[] | select(.title == \"${DIGEST_ISSUE_TITLE}\")][0].number" || true)"
+
+          if [ -z "$num" ] || [ "$num" = "null" ]; then
+            num="$(gh issue create --title "$DIGEST_ISSUE_TITLE" \
+                    --body "Daily summary of what lands in \`${UPSTREAM}\`. Each run appends a comment; nothing is posted on quiet days." \
+                    | grep -oE '[0-9]+$')"
+            echo "Created rolling digest issue #${num}"
+          fi
+
+          gh issue comment "$num" --body-file digest.md
+          echo "Posted digest to issue #${num}"
+
+      - name: Flag a stale pinned version on the landing page
         run: |
           set -euo pipefail
           git fetch -q origin "$OVERLAY_BRANCH"
@@ -111,12 +177,8 @@ jobs:
             | grep -oE 'Buzz_[0-9]+\.[0-9]+\.[0-9]+' | head -1 \
             | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || true)"
 
-          if [ -z "$latest_ver" ] || [ -z "$pinned_ver" ]; then
-            echo "Could not determine versions (latest='${latest_ver}' pinned='${pinned_ver}'); skipping."
-            exit 0
-          fi
-          if [ "$latest_ver" = "$pinned_ver" ]; then
-            echo "Landing page download links are current (${pinned_ver})."
+          if [ -z "$latest_ver" ] || [ -z "$pinned_ver" ] || [ "$latest_ver" = "$pinned_ver" ]; then
+            echo "Landing page links are current (pinned=${pinned_ver:-?} latest=${latest_ver:-?})."
             exit 0
           fi
 
@@ -132,13 +194,10 @@ jobs:
             echo "https://chat.duvalsoftware.com still point at **${pinned_ver}**."
             echo
             echo "Update the asset links in \`deploy/landing/index.html\` on"
-            echo "\`${OVERLAY_BRANCH}\`, then copy it to \`/opt/buzz-landing/index.html\`"
+            echo "\`${OVERLAY_BRANCH}\`, then copy the file to \`/opt/buzz-landing/index.html\`"
             echo "on buzz-relay-01. No restart needed — Caddy serves it from disk."
             echo
             echo "Release: https://github.com/${UPSTREAM}/releases/tag/${latest}"
-            echo
-            echo "_Opened automatically by the Watch upstream workflow._"
           } > release-body.md
 
           gh issue create --title "$title" --body-file release-body.md
-          echo "Opened issue: ${pinned_ver} -> ${latest_ver}"
