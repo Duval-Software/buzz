@@ -1,0 +1,144 @@
+name: Watch upstream
+
+# Keeps main a clean mirror of block/buzz and tells us when an upstream change
+# actually needs our attention. It never rewrites duval-deploy, so the running
+# server's clone is never invalidated by automation.
+
+on:
+  schedule:
+    - cron: "0 13 * * 1" # Mondays 13:00 UTC (~9am ET)
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+env:
+  GH_TOKEN: ${{ github.token }}
+  OVERLAY_BRANCH: duval-deploy
+  UPSTREAM: block/buzz
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fast-forward main from upstream
+        id: sync
+        run: |
+          set -euo pipefail
+          before="$(git rev-parse origin/main)"
+          gh api -X POST "repos/${GITHUB_REPOSITORY}/merge-upstream" -f branch=main >/dev/null 2>&1 || true
+          git fetch -q origin main
+          after="$(git rev-parse origin/main)"
+          {
+            echo "before=$before"
+            echo "after=$after"
+          } >> "$GITHUB_OUTPUT"
+          if [ "$before" = "$after" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "main already up to date at $after"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "main advanced: $before -> $after"
+          fi
+
+      - name: Flag upstream edits that collide with our deploy overlay
+        if: steps.sync.outputs.changed == 'true'
+        run: |
+          set -euo pipefail
+          git fetch -q origin "$OVERLAY_BRANCH"
+
+          # Files our overlay modifies, relative to where it branched off.
+          base="$(git merge-base origin/main "origin/${OVERLAY_BRANCH}")"
+          git diff --name-only "$base".."origin/${OVERLAY_BRANCH}" | sort -u > ours.txt
+
+          # Files upstream touched in this sync window.
+          git diff --name-only \
+            "${{ steps.sync.outputs.before }}".."${{ steps.sync.outputs.after }}" \
+            | sort -u > theirs.txt
+
+          comm -12 ours.txt theirs.txt > overlap.txt
+          n_commits="$(git rev-list --count \
+            "${{ steps.sync.outputs.before }}".."${{ steps.sync.outputs.after }}")"
+
+          if [ ! -s overlap.txt ]; then
+            echo "main advanced by ${n_commits} commit(s); none touched our overlay files."
+            exit 0
+          fi
+
+          title="Upstream changed files our deploy overlay patches"
+          if gh issue list --state open --search "\"${title}\" in:title" \
+               --json title -q '.[].title' | grep -qxF "$title"; then
+            echo "Issue already open; not duplicating."
+            exit 0
+          fi
+
+          {
+            echo "Upstream advanced by **${n_commits} commit(s)** and touched files that"
+            echo "\`${OVERLAY_BRANCH}\` also modifies. Rebase and re-test before deploying."
+            echo
+            echo "### Overlapping files"
+            sed 's/^/- `/; s/$/`/' overlap.txt
+            echo
+            echo "### Compare"
+            echo "https://github.com/${UPSTREAM}/compare/${{ steps.sync.outputs.before }}...${{ steps.sync.outputs.after }}"
+            echo
+            echo "### To reconcile"
+            echo '```bash'
+            echo "git fetch origin"
+            echo "git checkout ${OVERLAY_BRANCH}"
+            echo "git rebase origin/main    # resolve, then re-run the stack and verify"
+            echo '```'
+            echo
+            echo "_Opened automatically by the Watch upstream workflow._"
+          } > body.md
+
+          gh issue create --title "$title" --body-file body.md
+          echo "Opened issue for $(wc -l < overlap.txt) overlapping file(s)."
+
+      - name: Flag a new Buzz release if the landing page is pinned to an older one
+        run: |
+          set -euo pipefail
+          git fetch -q origin "$OVERLAY_BRANCH"
+
+          latest="$(gh release view --repo "$UPSTREAM" --json tagName -q .tagName 2>/dev/null || true)"
+          latest_ver="$(printf '%s' "$latest" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || true)"
+          pinned_ver="$(git show "origin/${OVERLAY_BRANCH}:deploy/landing/index.html" 2>/dev/null \
+            | grep -oE 'Buzz_[0-9]+\.[0-9]+\.[0-9]+' | head -1 \
+            | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || true)"
+
+          if [ -z "$latest_ver" ] || [ -z "$pinned_ver" ]; then
+            echo "Could not determine versions (latest='${latest_ver}' pinned='${pinned_ver}'); skipping."
+            exit 0
+          fi
+          if [ "$latest_ver" = "$pinned_ver" ]; then
+            echo "Landing page download links are current (${pinned_ver})."
+            exit 0
+          fi
+
+          title="Buzz ${latest_ver} released — landing page still links ${pinned_ver}"
+          if gh issue list --state open --search "\"${title}\" in:title" \
+               --json title -q '.[].title' | grep -qxF "$title"; then
+            echo "Issue already open; not duplicating."
+            exit 0
+          fi
+
+          {
+            echo "Upstream released **${latest_ver}**, but the download buttons on"
+            echo "https://chat.duvalsoftware.com still point at **${pinned_ver}**."
+            echo
+            echo "Update the asset links in \`deploy/landing/index.html\` on"
+            echo "\`${OVERLAY_BRANCH}\`, then copy it to \`/opt/buzz-landing/index.html\`"
+            echo "on buzz-relay-01. No restart needed — Caddy serves it from disk."
+            echo
+            echo "Release: https://github.com/${UPSTREAM}/releases/tag/${latest}"
+            echo
+            echo "_Opened automatically by the Watch upstream workflow._"
+          } > release-body.md
+
+          gh issue create --title "$title" --body-file release-body.md
+          echo "Opened issue: ${pinned_ver} -> ${latest_ver}"
