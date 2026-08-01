@@ -166,6 +166,17 @@ jobs:
             echo "Created rolling digest issue #${num}"
           fi
 
+          # A bot opened this issue, so nobody is auto-subscribed. An @mention
+          # notifies regardless of watch state. Change with:
+          #   gh variable set DIGEST_MENTION --repo <repo> --body "<github-handle>"
+          mention="${{ vars.DIGEST_MENTION }}"
+          if [ -n "$mention" ]; then
+            {
+              echo
+              echo "cc @${mention}"
+            } >> digest.md
+          fi
+
           gh issue comment "$num" --body-file digest.md
           echo "Posted digest to issue #${num}"
 
