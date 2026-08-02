@@ -13,6 +13,8 @@ services:
 
   caddy:
     image: caddy:2-alpine
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       relay:
         condition: service_healthy

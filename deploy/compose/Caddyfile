@@ -42,6 +42,13 @@
     file_server
   }
 
+  # Voice-note conversion: recorded audio in, canonical relay mp4 out.
+  # Served by the whisper sidecar on the docker host.
+  handle /voice/convert {
+    rewrite * /voicenote
+    reverse_proxy host.docker.internal:9077
+  }
+
   handle {
     root * /srv/app
     try_files {path} /index.html
