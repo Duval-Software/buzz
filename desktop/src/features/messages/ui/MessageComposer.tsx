@@ -7,6 +7,7 @@ import { useComposerAutofocus } from "@/features/messages/lib/useComposerAutofoc
 import type { ChannelSuggestion } from "@/features/messages/lib/useChannelLinks";
 import { useDrafts } from "@/features/messages/lib/useDrafts";
 import { resolveSentDraftKey } from "@/features/messages/ui/draftSubmitKey";
+import { VoiceNoteButton } from "@/features/messages/ui/VoiceNoteButton";
 import { useEmojiAutocomplete } from "@/features/messages/lib/useEmojiAutocomplete";
 import type { EmojiSuggestion } from "@/features/messages/lib/useEmojiAutocomplete";
 import { useCustomEmoji } from "@/features/custom-emoji/hooks";
@@ -988,7 +989,15 @@ function MessageComposerImpl({
               layoutMode={layoutMode}
               composerDisabled={disabled}
               editor={richText.editor}
-              extraActions={toolbarExtraActions}
+              extraActions={
+                <>
+                  <VoiceNoteButton
+                    disabled={disabled}
+                    onFile={(file) => void uploadFileRef.current(file)}
+                  />
+                  {toolbarExtraActions}
+                </>
+              }
               formattingDisabled={disabled}
               isEmojiPickerOpen={isEmojiPickerOpen}
               isFormattingOpen={isFormattingOpen}
