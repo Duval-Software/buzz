@@ -26,6 +26,9 @@ import { AvatarDisc } from "@/features/profile/ui/AvatarDisc";
 import { SearchPanel } from "@/features/search/ui/SearchPanel";
 import { NewDmPicker } from "@/features/dm/ui/NewDmPicker";
 import { MembersPanel } from "@/features/members/ui/MembersPanel";
+import { useInboxUnread } from "@/features/inbox/use-inbox";
+import { SurfacesNav } from "@/features/surfaces/ui/SurfacesNav";
+import { useSearch } from "@tanstack/react-router";
 import {
   MentionPopup,
   useMentionCandidates,
@@ -125,6 +128,8 @@ export function ChatPage() {
   const { typists, noteTyping } = useTyping(activeId, pubkey);
   const { unread } = useUnread(channelIds, activeId, pubkey);
   const { onlineCount, statusOf } = usePresence(pubkey);
+  const inboxUnread = useInboxUnread(pubkey);
+  const search = useSearch({ from: "/chat" });
   const names = useNames();
   const members = useMembers(membersOpen ? activeId : null);
   const mentionCandidates = useMentionCandidates(pubkey, mentionQuery);
@@ -137,12 +142,18 @@ export function ChatPage() {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   // Open the first channel once the list arrives, so the app is never a blank
-  // screen waiting for a click.
+  // screen waiting for a click. A ?channel= deep link (inbox, agents) wins
+  // over the default, and re-navigating while mounted switches channels.
+  const wantedChannel = search.channel;
   useEffect(() => {
+    if (wantedChannel && channels.some((c) => c.id === wantedChannel)) {
+      setActiveId(wantedChannel);
+      return;
+    }
     if (!activeId && channels.length > 0) {
       setActiveId(channels[0].id);
     }
-  }, [channels, activeId]);
+  }, [channels, activeId, wantedChannel]);
 
   // Follow the conversation on a NEW message, keyed by its id rather than the
   // array identity: that both satisfies the deps rule honestly and avoids
@@ -335,6 +346,7 @@ export function ChatPage() {
           </span>
           <ConnectionPill />
         </div>
+        <SurfacesNav inboxUnread={inboxUnread} />
         <nav className="flex-1 overflow-y-auto p-2">
           {channelsLoading && channels.length === 0 ? (
             <p className="px-2 py-1 text-neutral-500 text-sm">loading…</p>

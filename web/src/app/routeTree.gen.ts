@@ -5,21 +5,45 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from "./routes/root";
+import { Route as workflowsRouteImport } from "./routes/workflows";
 import { Route as reposRouteImport } from "./routes/repos";
+import { Route as pulseRouteImport } from "./routes/pulse";
+import { Route as inboxRouteImport } from "./routes/inbox";
 import { Route as chatRouteImport } from "./routes/chat";
+import { Route as agentsRouteImport } from "./routes/agents";
 import { Route as indexRouteImport } from "./routes/index";
 import { Route as reposDotrepoIdRouteImport } from "./routes/repos.$repoId";
 import { Route as inviteDotcodeRouteImport } from "./routes/invite.$code";
 import { Route as reposDotrepoIdDotblobDotsplatRouteImport } from "./routes/repos.$repoId.blob.$";
 
+const workflowsRoute = workflowsRouteImport.update({
+  id: "/workflows",
+  path: "/workflows",
+  getParentRoute: () => rootRouteImport,
+} as any);
 const reposRoute = reposRouteImport.update({
   id: "/repos",
   path: "/repos",
   getParentRoute: () => rootRouteImport,
 } as any);
+const pulseRoute = pulseRouteImport.update({
+  id: "/pulse",
+  path: "/pulse",
+  getParentRoute: () => rootRouteImport,
+} as any);
+const inboxRoute = inboxRouteImport.update({
+  id: "/inbox",
+  path: "/inbox",
+  getParentRoute: () => rootRouteImport,
+} as any);
 const chatRoute = chatRouteImport.update({
   id: "/chat",
   path: "/chat",
+  getParentRoute: () => rootRouteImport,
+} as any);
+const agentsRoute = agentsRouteImport.update({
+  id: "/agents",
+  path: "/agents",
   getParentRoute: () => rootRouteImport,
 } as any);
 const indexRoute = indexRouteImport.update({
@@ -46,16 +70,24 @@ const reposDotrepoIdDotblobDotsplatRoute =
 
 export interface FileRoutesByFullPath {
   "/": typeof indexRoute;
+  "/agents": typeof agentsRoute;
   "/chat": typeof chatRoute;
+  "/inbox": typeof inboxRoute;
+  "/pulse": typeof pulseRoute;
   "/repos": typeof reposRoute;
+  "/workflows": typeof workflowsRoute;
   "/invite/$code": typeof inviteDotcodeRoute;
   "/repos/$repoId": typeof reposDotrepoIdRoute;
   "/repos/$repoId/blob/$": typeof reposDotrepoIdDotblobDotsplatRoute;
 }
 export interface FileRoutesByTo {
   "/": typeof indexRoute;
+  "/agents": typeof agentsRoute;
   "/chat": typeof chatRoute;
+  "/inbox": typeof inboxRoute;
+  "/pulse": typeof pulseRoute;
   "/repos": typeof reposRoute;
+  "/workflows": typeof workflowsRoute;
   "/invite/$code": typeof inviteDotcodeRoute;
   "/repos/$repoId": typeof reposDotrepoIdRoute;
   "/repos/$repoId/blob/$": typeof reposDotrepoIdDotblobDotsplatRoute;
@@ -63,8 +95,12 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport;
   "/": typeof indexRoute;
+  "/agents": typeof agentsRoute;
   "/chat": typeof chatRoute;
+  "/inbox": typeof inboxRoute;
+  "/pulse": typeof pulseRoute;
   "/repos": typeof reposRoute;
+  "/workflows": typeof workflowsRoute;
   "/invite/$code": typeof inviteDotcodeRoute;
   "/repos/$repoId": typeof reposDotrepoIdRoute;
   "/repos/$repoId/blob/$": typeof reposDotrepoIdDotblobDotsplatRoute;
@@ -73,24 +109,36 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath;
   fullPaths:
     | "/"
+    | "/agents"
     | "/chat"
+    | "/inbox"
+    | "/pulse"
     | "/repos"
+    | "/workflows"
     | "/invite/$code"
     | "/repos/$repoId"
     | "/repos/$repoId/blob/$";
   fileRoutesByTo: FileRoutesByTo;
   to:
     | "/"
+    | "/agents"
     | "/chat"
+    | "/inbox"
+    | "/pulse"
     | "/repos"
+    | "/workflows"
     | "/invite/$code"
     | "/repos/$repoId"
     | "/repos/$repoId/blob/$";
   id:
     | "__root__"
     | "/"
+    | "/agents"
     | "/chat"
+    | "/inbox"
+    | "/pulse"
     | "/repos"
+    | "/workflows"
     | "/invite/$code"
     | "/repos/$repoId"
     | "/repos/$repoId/blob/$";
@@ -98,8 +146,12 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   indexRoute: typeof indexRoute;
+  agentsRoute: typeof agentsRoute;
   chatRoute: typeof chatRoute;
+  inboxRoute: typeof inboxRoute;
+  pulseRoute: typeof pulseRoute;
   reposRoute: typeof reposRoute;
+  workflowsRoute: typeof workflowsRoute;
   inviteDotcodeRoute: typeof inviteDotcodeRoute;
   reposDotrepoIdRoute: typeof reposDotrepoIdRoute;
   reposDotrepoIdDotblobDotsplatRoute: typeof reposDotrepoIdDotblobDotsplatRoute;
@@ -107,6 +159,13 @@ export interface RootRouteChildren {
 
 declare module "@tanstack/react-router" {
   interface FileRoutesByPath {
+    "/workflows": {
+      id: "/workflows";
+      path: "/workflows";
+      fullPath: "/workflows";
+      preLoaderRoute: typeof workflowsRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     "/repos": {
       id: "/repos";
       path: "/repos";
@@ -114,11 +173,32 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof reposRouteImport;
       parentRoute: typeof rootRouteImport;
     };
+    "/pulse": {
+      id: "/pulse";
+      path: "/pulse";
+      fullPath: "/pulse";
+      preLoaderRoute: typeof pulseRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/inbox": {
+      id: "/inbox";
+      path: "/inbox";
+      fullPath: "/inbox";
+      preLoaderRoute: typeof inboxRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     "/chat": {
       id: "/chat";
       path: "/chat";
       fullPath: "/chat";
       preLoaderRoute: typeof chatRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/agents": {
+      id: "/agents";
+      path: "/agents";
+      fullPath: "/agents";
+      preLoaderRoute: typeof agentsRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     "/": {
@@ -154,8 +234,12 @@ declare module "@tanstack/react-router" {
 
 const rootRouteChildren: RootRouteChildren = {
   indexRoute: indexRoute,
+  agentsRoute: agentsRoute,
   chatRoute: chatRoute,
+  inboxRoute: inboxRoute,
+  pulseRoute: pulseRoute,
   reposRoute: reposRoute,
+  workflowsRoute: workflowsRoute,
   inviteDotcodeRoute: inviteDotcodeRoute,
   reposDotrepoIdRoute: reposDotrepoIdRoute,
   reposDotrepoIdDotblobDotsplatRoute: reposDotrepoIdDotblobDotsplatRoute,
