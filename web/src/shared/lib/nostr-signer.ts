@@ -3,6 +3,7 @@ import {
   generateSecretKey,
   getPublicKey,
 } from "nostr-tools/pure";
+import { loadIdentity } from "@/shared/lib/identity";
 
 export type UnsignedNostrEvent = {
   kind: number;
@@ -89,6 +90,19 @@ export async function signNostrEvent(
       typeof signed.sig !== "string"
     ) {
       throw new Error("The NIP-07 extension returned an invalid signed event.");
+    }
+    return signed;
+  }
+
+  // A key this browser saved earlier. Unlike the ephemeral fallback it
+  // survives a reload, so it satisfies the durability requirement that
+  // `requireNip07` exists to protect: a membership row created with it can
+  // still be used by the same person tomorrow.
+  const stored = loadIdentity();
+  if (stored) {
+    const signed = finalizeEvent(unsigned, stored.secretKey);
+    if (signed.pubkey !== stored.pubkey) {
+      throw new Error("The stored browser identity failed to sign.");
     }
     return signed;
   }

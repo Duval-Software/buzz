@@ -2,6 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { App } from "@/app/App";
+import { registerServiceWorker } from "@/features/notifications/push-client";
 import "@fontsource-variable/inter/wght.css";
 import "@/shared/styles/globals.css";
 import { ThemeProvider } from "@/shared/theme/ThemeProvider";
@@ -21,6 +22,11 @@ const queryClient = new QueryClient({
     },
   },
 });
+
+// Register the worker on load so the app is installable and a returning member
+// who already granted permission keeps receiving pushes. Asking for permission
+// is NOT done here — that only happens from a real click in settings.
+void registerServiceWorker();
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>

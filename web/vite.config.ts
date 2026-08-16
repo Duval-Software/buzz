@@ -25,6 +25,15 @@ export default defineConfig({
   },
   server: {
     port: parseInt(process.env.VITE_PORT || "5173", 10),
+    proxy: {
+      // Blossom uploads are same-origin in production (Caddy proxies /upload
+      // to the relay); this gives dev the same shape, so the client code has
+      // exactly one path.
+      "/upload": {
+        target: "https://chat.creatorhive.ai",
+        changeOrigin: true,
+      },
+    },
     strictPort: true,
   },
 });

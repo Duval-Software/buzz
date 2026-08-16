@@ -17,6 +17,8 @@ const overrides = new Set([
   "src/features/repos/ui/PubkeyAvatar.tsx:29",
   // Array window (first N pubkeys), not string truncation.
   "src/features/repos/ui/OrgSidebar.tsx:22",
+  // Hue derivation for the avatar disc; the bytes become a color, not text.
+  "src/features/profile/ui/AvatarDisc.tsx:24",
 ]);
 
 await runPubkeyTruncationCheck({
