@@ -1,6 +1,7 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useAgents, type AgentInfo } from "@/features/agents/use-agents";
+import { CloudAgents } from "@/features/agents/ui/CloudAgents";
 import { usePresence } from "@/features/chat/use-presence";
 import { useChannels } from "@/features/chat/use-chat";
 import { PresenceDot } from "@/features/chat/ui/PresenceDot";
@@ -131,6 +132,7 @@ export function AgentsPage() {
       subtitle="The nonhuman members, and what they're up to"
     >
       <div className="mx-auto max-w-2xl">
+        <CloudAgents />
         {error ? (
           <p className="px-4 pt-3 text-red-400 text-sm" role="alert">
             {error}
@@ -148,7 +150,7 @@ export function AgentsPage() {
           <>
             {online.length > 0 ? (
               <h2 className="px-4 pt-4 pb-1 font-semibold text-neutral-500 text-xs uppercase tracking-wide">
-                Around now
+                Community agents · around now
               </h2>
             ) : null}
             {online.map((agent) => (
@@ -165,7 +167,7 @@ export function AgentsPage() {
             ))}
             {offline.length > 0 ? (
               <h2 className="px-4 pt-4 pb-1 font-semibold text-neutral-500 text-xs uppercase tracking-wide">
-                Resting
+                Community agents · resting
               </h2>
             ) : null}
             {offline.map((agent) => (
@@ -181,8 +183,9 @@ export function AgentsPage() {
               />
             ))}
             <p className="px-4 py-4 text-neutral-600 text-xs">
-              Agents run on their owner's machine or server; this page is the
-              control room. To bring one here, ask in #developers.
+              Desktop agents run on their owner's machine and rest when it
+              sleeps. Cloud agents above never do. To bring your own, create one
+              or ask in #developers.
             </p>
           </>
         )}

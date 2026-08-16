@@ -29,6 +29,8 @@ export type AgentConfig = {
   persona_id?: string;
   parallelism?: number;
   respond_to?: string;
+  /** A newest-record retire tombstone; retired agents leave the roster. */
+  retired?: boolean;
 };
 
 export type AgentInfo = {
@@ -136,19 +138,21 @@ export function useAgents(botPubkeys: string[]): {
   }, [socket, keysJoined]);
 
   const agents = useMemo(() => {
-    const out: AgentInfo[] = allKeys.map((pubkey) => {
-      const record = managed.get(pubkey);
-      const seen = activity.get(pubkey);
-      return {
-        pubkey,
-        configName: record?.config.name ?? null,
-        owner: record?.owner ?? null,
-        respondTo: record?.config.respond_to ?? null,
-        parallelism: record?.config.parallelism ?? null,
-        lastActive: seen?.at ?? null,
-        lastChannel: seen?.channel ?? null,
-      };
-    });
+    const out: AgentInfo[] = allKeys
+      .filter((pubkey) => !managed.get(pubkey)?.config.retired)
+      .map((pubkey) => {
+        const record = managed.get(pubkey);
+        const seen = activity.get(pubkey);
+        return {
+          pubkey,
+          configName: record?.config.name ?? null,
+          owner: record?.owner ?? null,
+          respondTo: record?.config.respond_to ?? null,
+          parallelism: record?.config.parallelism ?? null,
+          lastActive: seen?.at ?? null,
+          lastChannel: seen?.channel ?? null,
+        };
+      });
     out.sort((a, b) => (b.lastActive ?? 0) - (a.lastActive ?? 0));
     return out;
   }, [allKeys, managed, activity]);

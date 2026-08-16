@@ -29,6 +29,12 @@ export default defineConfig({
       // Blossom uploads are same-origin in production (Caddy proxies /upload
       // to the relay); this gives dev the same shape, so the client code has
       // exactly one path.
+      // agentkeeper in dev: the keeper's AK_PUBLIC_URLS includes
+      // localhost:5173 so dev-signed NIP-98 headers verify.
+      "/keeper": {
+        target: "https://app.creatorhive.ai",
+        changeOrigin: true,
+      },
       "/upload": {
         target: "https://chat.creatorhive.ai",
         changeOrigin: true,
