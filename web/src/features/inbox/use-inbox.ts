@@ -17,6 +17,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useLiveChannelMentions } from "@/features/inbox/use-live-mentions";
 import type { NostrEvent } from "@/shared/lib/nostr-client";
 import { getSocket } from "@/shared/lib/nostr-socket";
 import { signNostrEvent } from "@/shared/lib/nostr-signer";
@@ -130,6 +131,21 @@ export function useInbox(selfPubkey: string): {
     return unsubscribe;
   }, [socket, selfPubkey]);
 
+  // Live channel events (mentions, DMs, approval requests) arrive here: the
+  // relay never fans channel events out to the `#p` subscription above, so a
+  // per-channel layer feeds the same map. See use-live-mentions.ts.
+  const acceptLiveMention = useCallback((event: NostrEvent) => {
+    setEvents((prev) => {
+      if (prev.has(event.id)) {
+        return prev;
+      }
+      const next = new Map(prev);
+      next.set(event.id, event);
+      return next;
+    });
+  }, []);
+  useLiveChannelMentions(selfPubkey, acceptLiveMention);
+
   const { items, approvals } = useMemo(() => {
     const mentionItems: InboxItem[] = [];
     const approvalItems: ApprovalItem[] = [];
@@ -206,6 +222,27 @@ export function useInbox(selfPubkey: string): {
 export function useInboxUnread(selfPubkey: string): number {
   const socket = useMemo(() => getSocket(relayWsUrl()), []);
   const [ids, setIds] = useState<Set<string>>(new Set());
+
+  // Same relay constraint as useInbox: the `#p` subscription below only sees
+  // stored events and live GLOBAL events (pulse). Channel mentions and DMs
+  // land through the per-channel layer.
+  const acceptLiveMention = useCallback((event: NostrEvent) => {
+    if (event.kind === 46010) {
+      return; // the badge counts mentions; approvals count on the inbox page
+    }
+    if (event.created_at <= inboxSeenMarker()) {
+      return;
+    }
+    setIds((prev) => {
+      if (prev.has(event.id)) {
+        return prev;
+      }
+      const next = new Set(prev);
+      next.add(event.id);
+      return next;
+    });
+  }, []);
+  useLiveChannelMentions(selfPubkey, acceptLiveMention);
 
   useEffect(() => {
     if (!selfPubkey) {
