@@ -319,9 +319,11 @@ export function useMessages(channelId: string | null): {
       // the desktop composer produces; both native clients render from it.
       const tags = chatTags(channelId, thread);
       for (const media of attachments ?? []) {
+        // Voice notes are audio-only MP4, so they take the video media line.
+        const label = media.mime.startsWith("video/") ? "video" : "image";
         body = body
-          ? `${body}\n![image](${media.url})`
-          : `![image](${media.url})`;
+          ? `${body}\n![${label}](${media.url})`
+          : `![${label}](${media.url})`;
         tags.push(imetaTagFor(media));
       }
       // Tags are part of what gets signed, so the self-mention filter needs

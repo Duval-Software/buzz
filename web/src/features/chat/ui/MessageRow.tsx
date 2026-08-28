@@ -5,6 +5,12 @@ import {
   contentWithoutMediaLines,
   mediaLinesOf,
 } from "@/features/chat/message-media";
+import { formatVoiceNoteDuration } from "@/features/chat/voice-note";
+import {
+  AuthedAudio,
+  AuthedImage,
+  AuthedVideo,
+} from "@/features/chat/ui/AuthedMedia";
 import { segmentContent } from "@/features/chat/rich-text";
 import { useNames } from "@/features/profile/use-profiles";
 import { cn } from "@/shared/lib/cn";
@@ -220,13 +226,28 @@ export function MessageRow({
       {(message.media ?? []).length > 0 ? (
         <div className="mt-1.5 flex flex-col gap-1.5">
           {(message.media ?? []).map((item) =>
-            item.kind === "video" ? (
-              // biome-ignore lint/a11y/useMediaCaption: user uploads carry no caption track
-              <video
+            item.kind === "voice" ? (
+              <div
                 key={item.url}
-                src={item.url}
-                controls
-                preload="metadata"
+                className="flex max-w-md items-center gap-2.5 rounded-lg border border-neutral-800 bg-neutral-900/60 px-3 py-2"
+              >
+                <span aria-hidden="true" className="shrink-0 text-lg">
+                  🎙️
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-neutral-400 text-xs">
+                    Voice note
+                    {item.duration
+                      ? ` · ${formatVoiceNoteDuration(item.duration)}`
+                      : ""}
+                  </p>
+                  <AuthedAudio url={item.url} className="mt-1 h-9 w-full" />
+                </div>
+              </div>
+            ) : item.kind === "video" ? (
+              <AuthedVideo
+                key={item.url}
+                url={item.url}
                 className="max-h-80 max-w-md rounded-lg border border-neutral-800 bg-black"
                 style={item.ratio ? { aspectRatio: item.ratio } : undefined}
               />
@@ -245,10 +266,10 @@ export function MessageRow({
                   (found live, not in review). Timelines are capped at 200
                   messages and media is relay-local, so eager is cheap.
                 */}
-                <img
-                  src={item.url}
+                <AuthedImage
+                  url={item.url}
                   alt="attachment"
-                  className="w-full max-w-md rounded-lg border border-neutral-800 object-contain"
+                  className="w-full max-w-md rounded-lg border border-neutral-800 bg-neutral-900 object-contain"
                   style={item.ratio ? { aspectRatio: item.ratio } : undefined}
                 />
               </a>

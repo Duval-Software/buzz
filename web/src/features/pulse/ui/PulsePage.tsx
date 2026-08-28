@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { contentWithoutMediaLines } from "@/features/chat/message-media";
+import { AuthedImage, AuthedVideo } from "@/features/chat/ui/AuthedMedia";
 import { usePulse, type PulseNote } from "@/features/pulse/use-pulse";
 import { AvatarDisc } from "@/features/profile/ui/AvatarDisc";
 import { useNames } from "@/features/profile/use-profiles";
@@ -67,24 +68,20 @@ function NoteCard({
         {contentWithoutMediaLines(note.content)}
       </p>
       {note.media.map((item) =>
-        item.kind === "video" ? (
-          // biome-ignore lint/a11y/useMediaCaption: user uploads carry no caption track
-          <video
+        item.kind === "video" || item.kind === "voice" ? (
+          <AuthedVideo
             key={item.url}
-            src={item.url}
-            controls
-            preload="metadata"
+            url={item.url}
             className="mt-2 max-h-80 max-w-md rounded-lg border border-neutral-800 bg-black"
           />
         ) : (
-          <a key={item.url} href={item.url} target="_blank" rel="noreferrer">
-            <img
-              src={item.url}
-              alt="attachment"
-              className="mt-2 w-full max-w-md rounded-lg border border-neutral-800 object-contain"
-              style={item.ratio ? { aspectRatio: item.ratio } : undefined}
-            />
-          </a>
+          <AuthedImage
+            key={item.url}
+            url={item.url}
+            alt="attachment"
+            className="mt-2 w-full max-w-md rounded-lg border border-neutral-800 bg-neutral-900 object-contain"
+            style={item.ratio ? { aspectRatio: item.ratio } : undefined}
+          />
         ),
       )}
       <div className="mt-2 flex gap-2">

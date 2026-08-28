@@ -23,7 +23,9 @@ export type MessageMedia = {
   mime: string;
   /** width/height when declared, for reserving layout space. */
   ratio: number | null;
-  kind: "image" | "video";
+  kind: "image" | "video" | "voice";
+  /** Declared seconds, for voice-note duration labels. */
+  duration: number | null;
 };
 
 const MEDIA_PATH_RE = /^\/media\/[0-9a-f]{64}\.[a-z0-9]{1,8}$/;
@@ -55,6 +57,8 @@ export function mediaFromTags(tags: string[][]): MessageMedia[] {
     let url = "";
     let mime = "";
     let dim = "";
+    let filename = "";
+    let duration: number | null = null;
     for (const part of tag.slice(1)) {
       const sep = part.indexOf(" ");
       if (sep <= 0) {
@@ -68,16 +72,32 @@ export function mediaFromTags(tags: string[][]): MessageMedia[] {
         mime = value;
       } else if (key === "dim") {
         dim = value;
+      } else if (key === "filename") {
+        filename = value;
+      } else if (key === "duration") {
+        const n = Number(value);
+        duration = Number.isFinite(n) && n > 0 ? n : null;
       }
     }
     if (!url || !isRelayMediaUrl(url)) {
       continue;
     }
-    const kind = mime.startsWith("video/")
-      ? "video"
-      : mime.startsWith("image/")
-        ? "image"
-        : null;
+    // Voice notes travel as audio-only MP4 through the video pipeline
+    // (the relay refuses raw audio uploads), marked by their filename.
+    // Plain audio mimes count too, for interop with clients that send them.
+    const lowerName = filename.toLowerCase();
+    const isVoiceNote =
+      mime.startsWith("audio/") ||
+      (mime === "video/mp4" &&
+        lowerName.startsWith("voice-note-") &&
+        lowerName.endsWith(".mp4"));
+    const kind = isVoiceNote
+      ? "voice"
+      : mime.startsWith("video/")
+        ? "video"
+        : mime.startsWith("image/")
+          ? "image"
+          : null;
     if (!kind) {
       continue;
     }
@@ -90,7 +110,7 @@ export function mediaFromTags(tags: string[][]): MessageMedia[] {
         ratio = w / h;
       }
     }
-    out.push({ url, mime, ratio, kind });
+    out.push({ url, mime, ratio, kind, duration });
   }
   return out;
 }

@@ -23,14 +23,18 @@ async function sha256Hex(value: string): Promise<string> {
 export async function makeNip98AuthHeader(
   url: string,
   method: string,
-  options?: { body?: string; requireNip07?: boolean },
+  options?: { body?: string; payloadSha256?: string; requireNip07?: boolean },
 ): Promise<string> {
   const tags = [
     ["u", url],
     ["method", method],
   ];
-  if (options?.body !== undefined) {
-    tags.push(["payload", await sha256Hex(options.body)]);
+  // Binary bodies hash themselves and pass the digest; string bodies hash here.
+  const payload =
+    options?.payloadSha256 ??
+    (options?.body !== undefined ? await sha256Hex(options.body) : undefined);
+  if (payload !== undefined) {
+    tags.push(["payload", payload]);
     tags.push(["nonce", crypto.randomUUID()]);
   }
   const event = await signNostrEvent(

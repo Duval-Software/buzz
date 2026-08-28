@@ -26,6 +26,11 @@ export type UploadedMedia = {
   size: number;
   mime: string;
   dim: string | null;
+  /** Seconds, for voice notes and video. */
+  duration?: number;
+  /** Voice notes carry their `voice-note-*.mp4` name so renderers can tell
+   * them apart from ordinary video. */
+  filename?: string;
 };
 
 async function sha256Hex(data: ArrayBuffer): Promise<string> {
@@ -59,8 +64,23 @@ export async function uploadImage(file: File): Promise<UploadedMedia> {
   if (file.size > MAX_IMAGE_BYTES) {
     throw new Error("That image is over 10 MB; the relay will refuse it.");
   }
+  const media = await uploadBytes(
+    await file.arrayBuffer(),
+    file.type,
+    MAX_IMAGE_BYTES,
+  );
+  return { ...media, dim: await imageDimensions(file) };
+}
 
-  const bytes = await file.arrayBuffer();
+/** The raw Blossom PUT, shared by images and voice notes. */
+export async function uploadBytes(
+  bytes: ArrayBuffer,
+  mime: string,
+  maxBytes: number,
+): Promise<UploadedMedia> {
+  if (bytes.byteLength > maxBytes) {
+    throw new Error("That file is too large; the relay will refuse it.");
+  }
   const sha = await sha256Hex(bytes);
   const relayHost = new URL(relayHttpBaseUrl()).host;
 
@@ -81,7 +101,7 @@ export async function uploadImage(file: File): Promise<UploadedMedia> {
     method: "PUT",
     body: bytes,
     headers: {
-      "Content-Type": file.type,
+      "Content-Type": mime,
       "X-SHA-256": sha,
       Authorization: `Nostr ${btoa(JSON.stringify(auth))
         .replace(/\+/g, "-")
@@ -116,8 +136,8 @@ export async function uploadImage(file: File): Promise<UploadedMedia> {
     url: desc.url,
     sha256: desc.sha256,
     size: desc.size,
-    mime: desc.type || file.type,
-    dim: await imageDimensions(file),
+    mime: desc.type || mime,
+    dim: null,
   };
 }
 
@@ -132,6 +152,12 @@ export function imetaTagFor(media: UploadedMedia): string[] {
   ];
   if (media.dim) {
     tag.push(`dim ${media.dim}`);
+  }
+  if (media.duration != null) {
+    tag.push(`duration ${media.duration}`);
+  }
+  if (media.filename) {
+    tag.push(`filename ${media.filename}`);
   }
   return tag;
 }

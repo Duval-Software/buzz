@@ -21,6 +21,12 @@ import {
 import { usePresence } from "@/features/chat/use-presence";
 import { useReactions, useTyping } from "@/features/chat/use-reactions";
 import { uploadImage, type UploadedMedia } from "@/features/chat/upload";
+import { useVoiceRecorder } from "@/features/chat/use-voice-recorder";
+import {
+  formatVoiceNoteDuration,
+  prepareVoiceNote,
+  VOICE_NOTE_MAX_DURATION_SECONDS,
+} from "@/features/chat/voice-note";
 import { useUnread } from "@/features/chat/use-unread";
 import { AvatarDisc } from "@/features/profile/ui/AvatarDisc";
 import { SearchPanel } from "@/features/search/ui/SearchPanel";
@@ -115,6 +121,19 @@ export function ChatPage() {
   const [sendError, setSendError] = useState<string | null>(null);
   const [attachment, setAttachment] = useState<UploadedMedia | null>(null);
   const [uploading, setUploading] = useState(false);
+  const recorder = useVoiceRecorder();
+  // Stop-and-send when a recording hits the cap. Narrow deps on purpose:
+  // onVoiceSend is recreated per render, and the status guard prevents
+  // re-entry once the stop begins.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: narrow deps by design
+  useEffect(() => {
+    if (
+      recorder.status === "recording" &&
+      recorder.elapsedSeconds >= VOICE_NOTE_MAX_DURATION_SECONDS
+    ) {
+      void onVoiceSend();
+    }
+  }, [recorder.status, recorder.elapsedSeconds]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [openThreadRoot, setOpenThreadRoot] = useState<string | null>(null);
   const [videoOpen, setVideoOpen] = useState(false);
@@ -304,6 +323,27 @@ export function ChatPage() {
       setAttachment(await uploadImage(file));
     } catch (cause) {
       setSendError(cause instanceof Error ? cause.message : "could not upload");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function onVoiceSend() {
+    const take = await recorder.stop();
+    if (!take) {
+      return;
+    }
+    setUploading(true);
+    setSendError(null);
+    try {
+      const media = await prepareVoiceNote(take.wav, take.duration);
+      await send("", undefined, [media]);
+    } catch (cause) {
+      setSendError(
+        cause instanceof Error
+          ? cause.message
+          : "could not send the voice note",
+      );
     } finally {
       setUploading(false);
     }
@@ -619,6 +659,47 @@ export function ChatPage() {
               </button>
             </div>
           ) : null}
+          {recorder.error ? (
+            <p className="mb-2 text-red-400 text-sm">{recorder.error}</p>
+          ) : null}
+          {recorder.status !== "idle" ? (
+            <div className="mb-2 flex items-center gap-3 rounded-lg border border-red-900/60 bg-neutral-900 px-3 py-2">
+              <span className="relative flex h-2.5 w-2.5 shrink-0">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-60" />
+                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-500" />
+              </span>
+              <span className="text-neutral-200 text-sm tabular-nums">
+                {formatVoiceNoteDuration(recorder.elapsedSeconds)}
+              </span>
+              <span
+                aria-hidden="true"
+                className="h-4 flex-1 overflow-hidden rounded bg-neutral-800"
+              >
+                <span
+                  className="block h-full bg-amber-500/80 transition-[width] duration-100"
+                  style={{ width: `${Math.round(recorder.level * 100)}%` }}
+                />
+              </span>
+              <button
+                type="button"
+                onClick={() => recorder.cancel()}
+                disabled={recorder.status === "processing" || uploading}
+                className="shrink-0 rounded-lg border border-neutral-700 px-2.5 py-1 text-neutral-300 text-xs disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void onVoiceSend()}
+                disabled={recorder.status === "processing" || uploading}
+                className="shrink-0 rounded-lg bg-amber-500 px-3 py-1 font-semibold text-neutral-950 text-xs disabled:opacity-50"
+              >
+                {recorder.status === "processing" || uploading
+                  ? "Sending…"
+                  : "Send"}
+              </button>
+            </div>
+          ) : null}
           <div className="relative flex items-center gap-2">
             <MentionPopup
               candidates={mentionCandidates}
@@ -641,6 +722,17 @@ export function ChatPage() {
             >
               {uploading ? "…" : "📎"}
             </button>
+            {recorder.status === "idle" && !draft.trim() ? (
+              <button
+                type="button"
+                aria-label="Record a voice note"
+                onClick={() => void recorder.start()}
+                disabled={uploading || !activeId}
+                className="shrink-0 rounded-lg border border-neutral-700 px-2.5 py-2 text-neutral-300 text-sm disabled:opacity-50"
+              >
+                🎙️
+              </button>
+            ) : null}
             <input
               ref={composerRef}
               value={draft}
