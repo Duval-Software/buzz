@@ -13,6 +13,7 @@
  * (sha-addressed), so there is nothing to invalidate.
  */
 
+import { subscribeIdentity } from "@/shared/lib/identity";
 import { useEffect, useState } from "react";
 import { relayHttpBaseUrl } from "@/shared/lib/relay-url";
 import { signNostrEvent } from "@/shared/lib/nostr-signer";
@@ -53,6 +54,16 @@ function mediaAuthHeader(): Promise<string> {
 }
 
 const objectUrls = new Map<string, Promise<string>>();
+subscribeIdentity(() => {
+  cachedAuth = null;
+  authExpiresAt = 0;
+  for (const pending of objectUrls.values())
+    void pending.then(
+      (url) => URL.revokeObjectURL(url),
+      () => {},
+    );
+  objectUrls.clear();
+});
 
 /**
  * Resolve a relay media URL to a playable/renderable object URL.
@@ -72,19 +83,21 @@ export function fetchAuthedMedia(url: string): Promise<string> {
       return URL.createObjectURL(await response.blob());
     })();
     pending.catch(() => {
-      objectUrls.delete(path);
+      if (objectUrls.get(path) === pending) objectUrls.delete(path);
     });
     objectUrls.set(path, pending);
   }
   return pending;
 }
 
-/** The object URL for a relay media URL, or null while it loads or on error. */
-export function useAuthedMediaUrl(url: string): string | null {
+/** Authenticated media state, including transport and native decode failures. */
+export function useAuthedMediaUrl(url: string) {
+  const [failed, setFailed] = useState(false);
   const [src, setSrc] = useState<string | null>(null);
   useEffect(() => {
     let alive = true;
     setSrc(null);
+    setFailed(false);
     fetchAuthedMedia(url)
       .then((objectUrl) => {
         if (alive) {
@@ -92,11 +105,11 @@ export function useAuthedMediaUrl(url: string): string | null {
         }
       })
       .catch(() => {
-        // The element simply never gets a src; the card shows its shell.
+        if (alive) setFailed(true);
       });
     return () => {
       alive = false;
     };
   }, [url]);
-  return src;
+  return { src, failed, onError: () => setFailed(true) };
 }

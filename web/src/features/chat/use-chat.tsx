@@ -13,7 +13,17 @@
  * choke point instead of being un-applied.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  createContext,
+  useContext,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import { useMembership } from "@/features/identity/use-identity";
 import {
   KIND_CHANNEL_METADATA,
   KIND_CHAT,
@@ -40,6 +50,7 @@ export type Channel = {
   id: string;
   name: string;
   about?: string;
+  postingPolicy?: "all" | "admins";
   /** Relay-managed direct messages are channels too, tagged ["t","dm"]. */
   kind: "channel" | "dm";
   /** For DMs: everyone in the conversation, including the reader. */
@@ -103,6 +114,8 @@ function toChannel(event: NostrEvent): Channel | null {
     id,
     name: tagValue(event, "name") ?? id,
     about: tagValue(event, "about"),
+    postingPolicy:
+      tagValue(event, "posting_policy") === "admins" ? "admins" : "all",
     kind: isDm ? "dm" : "channel",
     participants: event.tags
       .filter((t) => t[0] === "p" && typeof t[1] === "string")
@@ -118,33 +131,88 @@ export function useRelayState(): ConnectionState {
   return state;
 }
 
-/** Every channel this member can see, kept current as they change. */
-export function useChannels(): { channels: Channel[]; loading: boolean } {
-  const socket = useMemo(() => getSocket(relayWsUrl()), []);
+type ChannelState = {
+  channels: Channel[];
+  loading: boolean;
+  error: string | null;
+  retry: () => void;
+};
+const ChannelsContext = createContext<ChannelState | null>(null);
+
+/** Keep channel history alive across routes, isolated by relay and account. */
+export function ChannelsProvider({ children }: { children: ReactNode }) {
+  const { identity, status } = useMembership();
+  const relay = relayWsUrl();
+  return (
+    <ChannelSubscription
+      key={`${relay}:${identity?.pubkey ?? ""}:${status}`}
+      relay={relay}
+      enabled={status === "member"}
+    >
+      {children}
+    </ChannelSubscription>
+  );
+}
+
+function ChannelSubscription({
+  children,
+  relay,
+  enabled,
+}: {
+  children: ReactNode;
+  relay: string;
+  enabled: boolean;
+}) {
+  const socket = useMemo(() => getSocket(relay), [relay]);
   const [byId, setById] = useState<Map<string, Channel>>(new Map());
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [reload, setReload] = useState(0);
+  const retry = useCallback(() => setReload((value) => value + 1), []);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reload explicitly restarts a refused subscription.
   useEffect(() => {
-    const unsubscribe = socket.subscribe(
-      [{ kinds: [KIND_CHANNEL_METADATA], limit: 200 }],
-      {
-        onEvent: (event) => {
-          const channel = toChannel(event);
-          if (!channel) {
-            return;
-          }
-          setById((prev) => {
-            const next = new Map(prev);
-            next.set(channel.id, channel);
-            return next;
-          });
+    if (!enabled) return;
+    let unsubscribe = () => {};
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let retries = 0;
+    const subscribe = () => {
+      unsubscribe();
+      setLoading(true);
+      setError(null);
+      unsubscribe = socket.subscribe(
+        [{ kinds: [KIND_CHANNEL_METADATA], limit: 200 }],
+        {
+          onEvent: (event) => {
+            const channel = toChannel(event);
+            if (!channel) return;
+            setById((prev) => new Map(prev).set(channel.id, channel));
+          },
+          onEose: () => {
+            setLoading(false);
+            setError(null);
+          },
+          onClosed: (reason) => {
+            setLoading(false);
+            setError("Channels couldn’t load.");
+            if (reason.startsWith("rate-limited:") && retries < 3) {
+              const retrySeconds = Number(reason.match(/retry in (\d+)s/)?.[1]);
+              const delay =
+                retrySeconds > 0 ? retrySeconds * 1000 : 1000 * 2 ** retries;
+              retries += 1;
+              clearTimeout(timer);
+              timer = setTimeout(subscribe, Math.min(delay, 60_000));
+            }
+          },
         },
-        onEose: () => setLoading(false),
-        onClosed: () => setLoading(false),
-      },
-    );
-    return unsubscribe;
-  }, [socket]);
+      );
+    };
+    subscribe();
+    return () => {
+      clearTimeout(timer);
+      unsubscribe();
+    };
+  }, [socket, enabled, reload]);
 
   const channels = useMemo(
     () =>
@@ -153,8 +221,18 @@ export function useChannels(): { channels: Channel[]; loading: boolean } {
       ),
     [byId],
   );
+  return (
+    <ChannelsContext.Provider value={{ channels, loading, error, retry }}>
+      {children}
+    </ChannelsContext.Provider>
+  );
+}
 
-  return { channels, loading };
+/** Read the shared channel list without opening a subscription per page. */
+export function useChannels(): ChannelState {
+  const state = useContext(ChannelsContext);
+  if (!state) throw new Error("useChannels requires ChannelsProvider");
+  return state;
 }
 
 /**

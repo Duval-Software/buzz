@@ -1,0 +1,73 @@
+.message-markdown {
+  min-width: 0;
+  font-size: 1rem;
+  line-height: 1.625;
+  overflow-wrap: anywhere;
+}
+.message-markdown :where(p, ul, ol, blockquote, pre, table) {
+  margin: 0.5em 0;
+}
+.message-markdown > :first-child {
+  margin-top: 0;
+}
+.message-markdown > :last-child {
+  margin-bottom: 0;
+}
+.message-markdown :where(p, li) {
+  white-space: pre-wrap;
+}
+.message-markdown :where(ul, ol) {
+  padding-left: 1.5em;
+}
+.message-markdown ul {
+  list-style-type: disc;
+}
+.message-markdown ol {
+  list-style-type: decimal;
+}
+.message-markdown :where(h1, h2, h3, h4, h5, h6) {
+  font-size: 1em;
+  font-weight: 600;
+  margin: 0.75em 0 0.25em;
+}
+.message-markdown blockquote {
+  border-left: 2px solid #737373;
+  padding-left: 0.75em;
+}
+.message-markdown a {
+  color: #fbbf24;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.message-markdown a:focus-visible {
+  outline: 2px solid #fbbf24;
+  outline-offset: 2px;
+}
+.message-markdown code {
+  font-size: 0.875rem;
+  background: #262626;
+  border-radius: 0.25rem;
+  padding: 0.125em 0.25em;
+}
+.message-markdown pre {
+  overflow-x: auto;
+  white-space: pre;
+  background: #171717;
+  border-radius: 0.5rem;
+  padding: 0.75em;
+}
+.message-markdown pre code {
+  white-space: pre;
+  background: none;
+  padding: 0;
+}
+.message-markdown table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+}
+.message-markdown :where(th, td) {
+  border: 1px solid #525252;
+  padding: 0.25em 0.5em;
+}

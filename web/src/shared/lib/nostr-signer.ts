@@ -78,6 +78,21 @@ export async function signNostrEvent(
     ...template,
     created_at: template.created_at ?? Math.floor(Date.now() / 1000),
   };
+  // An explicitly signed-in account wins over an unrelated extension identity.
+  const account = loadIdentity();
+  if (account?.username) {
+    if (
+      account.sessionToken &&
+      (unsigned.kind === 22242 ||
+        unsigned.kind === 27235 ||
+        unsigned.kind === 24242)
+    )
+      unsigned.tags = [
+        ...unsigned.tags,
+        ["account-session", account.sessionToken],
+      ];
+    return finalizeEvent(unsigned, account.secretKey);
+  }
   const provider = typeof window === "undefined" ? undefined : window.nostr;
 
   if (provider) {

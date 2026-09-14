@@ -1,4 +1,5 @@
-import { useNavigate } from "@tanstack/react-router";
+import { Bot } from "lucide-react";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useAgents, type AgentInfo } from "@/features/agents/use-agents";
 import { CloudAgents } from "@/features/agents/ui/CloudAgents";
@@ -18,19 +19,19 @@ import { useSyncExternalStore } from "react";
 
 function ago(ts: number | null): string {
   if (!ts) {
-    return "no visible activity yet";
+    return "No messages in the loaded history";
   }
   const delta = Date.now() / 1000 - ts;
   if (delta < 120) {
-    return "active just now";
+    return "Last message just now";
   }
   if (delta < 3600) {
-    return `active ${Math.round(delta / 60)}m ago`;
+    return `Last message ${Math.round(delta / 60)}m ago`;
   }
   if (delta < 86400) {
-    return `active ${Math.round(delta / 3600)}h ago`;
+    return `Last message ${Math.round(delta / 3600)}h ago`;
   }
-  return `active ${Math.round(delta / 86400)}d ago`;
+  return `Last message ${Math.round(delta / 86400)}d ago`;
 }
 
 function AgentCard({
@@ -51,26 +52,27 @@ function AgentCard({
   busy: boolean;
 }) {
   return (
-    <div className="flex items-start gap-3 border-neutral-800 border-b px-4 py-3">
+    <div className="hive-list-row flex items-start gap-3 border-neutral-800 border-b">
       <AvatarDisc pubkey={agent.pubkey} name={name} size={34} />
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <b className="text-sm">{name}</b>
           <PresenceDot status={status} />
-          <span className="rounded border border-cyan-900 px-1 text-cyan-400 text-xs">
-            agent
-          </span>
-          {agent.respondTo ? (
-            <span className="rounded border border-neutral-700 px-1 text-neutral-500 text-xs">
-              responds to {agent.respondTo}
-            </span>
-          ) : null}
+          <span className="hive-agent-tag">agent</span>
         </div>
-        <p className="mt-0.5 text-neutral-500 text-xs">
-          {ago(agent.lastActive)}
-          {channelName ? ` in #${channelName}` : ""}
-          {ownerName ? ` · run by ${ownerName}` : ""}
-          {agent.parallelism ? ` · ${agent.parallelism} parallel turns` : ""}
+        <p className="hive-agent-details">
+          <span>
+            {ownerName ? `Managed by ${ownerName}` : "Community agent"}
+          </span>
+          {agent.respondTo ? <span>Responds to {agent.respondTo}</span> : null}
+          <br />
+          <span>
+            {ago(agent.lastActive)}
+            {channelName ? ` in #${channelName}` : ""}
+          </span>
+          {agent.parallelism ? (
+            <span>Up to {agent.parallelism} parallel turns</span>
+          ) : null}
         </p>
       </div>
       <button
@@ -127,11 +129,8 @@ export function AgentsPage() {
   const offline = agents.filter((a) => statusOf(a.pubkey) === "offline");
 
   return (
-    <SurfaceShell
-      title="Agents"
-      subtitle="The nonhuman members, and what they're up to"
-    >
-      <div className="mx-auto max-w-2xl">
+    <SurfaceShell title="Agents">
+      <div className="hive-feed">
         <CloudAgents />
         {error ? (
           <p className="px-4 pt-3 text-red-400 text-sm" role="alert">
@@ -143,14 +142,29 @@ export function AgentsPage() {
             looking for agents…
           </p>
         ) : agents.length === 0 ? (
-          <p className="px-4 py-6 text-neutral-500 text-sm">
-            No agents registered yet.
-          </p>
+          <div className="hive-empty">
+            <Bot aria-hidden="true" />
+            <h3>Room for a new collaborator.</h3>
+            <p>
+              Registered community agents will appear here. Ask in #developers
+              to get started.
+            </p>
+          </div>
         ) : (
-          <>
+          <section aria-label="Community agent directory">
+            <div className="hive-section-heading">
+              <Bot size={20} aria-hidden="true" />
+              <div>
+                <h2>Community directory</h2>
+                <p>
+                  {agents.length} registered identities · presence is not
+                  running-task status
+                </p>
+              </div>
+            </div>
             {online.length > 0 ? (
               <h2 className="px-4 pt-4 pb-1 font-semibold text-neutral-500 text-xs uppercase tracking-wide">
-                Community agents · around now
+                Around now · {online.length}
               </h2>
             ) : null}
             {online.map((agent) => (
@@ -167,7 +181,7 @@ export function AgentsPage() {
             ))}
             {offline.length > 0 ? (
               <h2 className="px-4 pt-4 pb-1 font-semibold text-neutral-500 text-xs uppercase tracking-wide">
-                Community agents · resting
+                Offline · {offline.length}
               </h2>
             ) : null}
             {offline.map((agent) => (
@@ -182,13 +196,29 @@ export function AgentsPage() {
                 busy={busyPk === agent.pubkey}
               />
             ))}
-            <p className="px-4 py-4 text-neutral-600 text-xs">
-              Desktop agents run on their owner's machine and rest when it
-              sleeps. Cloud agents above never do. To bring your own, create one
-              or ask in #developers.
+            <p className="hive-panel-note">
+              Presence is based on recent connections. Desktop agents run on
+              their owner’s device; cloud runtime status appears above when the
+              service is reachable.
             </p>
-          </>
+          </section>
         )}
+        <details className="mt-6 border-t border-neutral-800 pt-4">
+          <summary className="cursor-pointer text-sm text-neutral-400">
+            Advanced
+          </summary>
+          <div className="py-4">
+            <Link
+              to="/workflows"
+              className="text-sm text-amber-300 underline underline-offset-4"
+            >
+              Workflows
+            </Link>
+            <p className="mt-2 text-sm text-neutral-500">
+              Create and manage channel automations.
+            </p>
+          </div>
+        </details>
       </div>
     </SurfaceShell>
   );

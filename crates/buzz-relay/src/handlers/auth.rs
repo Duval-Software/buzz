@@ -76,6 +76,7 @@ pub async fn handle_auth(event: nostr::Event, conn: Arc<ConnectionState>, state:
     // The tag is integrity-protected by the event's Schnorr signature — if
     // tampered, NIP-42 verification will fail before we ever inspect it.
     let auth_tag_json = extract_auth_tag_json(&event);
+    let account_session = crate::api::accounts::session_hash(&event);
 
     let relay_url =
         crate::api::bridge::nip42_expected_relay_url(&state.config.relay_url, &conn.tenant);
@@ -90,6 +91,28 @@ pub async fn handle_auth(event: nostr::Event, conn: Arc<ConnectionState>, state:
     {
         Ok(mut auth_ctx) => {
             let pubkey = auth_ctx.pubkey;
+            let credential_owner = crate::api::relay_members::extract_nip_oa_owner(
+                pubkey.as_bytes(),
+                auth_tag_json.as_deref(),
+            );
+            if !crate::api::accounts::has_account_session(
+                &state,
+                &conn.tenant,
+                &pubkey,
+                credential_owner.as_ref(),
+                account_session.as_deref(),
+            )
+            .await
+            {
+                conn.send(RelayMessage::ok(
+                    &event_id_hex,
+                    false,
+                    "auth-required: Session expired. Sign in again.",
+                ));
+                *conn.auth_state.write().await = AuthState::Failed;
+                return;
+            }
+            *conn.account_session.write().await = (account_session, credential_owner);
 
             // Community ban gate (NIP-42 seam). Runs immediately after auth
             // verification succeeds and before the allowlist and relay-membership

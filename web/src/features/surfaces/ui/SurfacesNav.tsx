@@ -1,34 +1,74 @@
+import type { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
+import { Activity, Inbox } from "lucide-react";
 
-/**
- * The row of community surfaces at the top of the channel sidebar.
- *
- * Chat is where people live; these are the places they visit. Each entry is a
- * real route so the browser back button, deep links, and phone home-screen
- * shortcuts all behave.
- */
-export function SurfacesNav({ inboxUnread = 0 }: { inboxUnread?: number }) {
-  const item =
-    "flex items-center gap-2 rounded-lg px-2 py-1.5 text-neutral-300 text-sm hover:bg-neutral-900";
+/** Shared community identity for navigation and onboarding. */
+export function HiveBrand({
+  channel,
+  onNavigate,
+}: {
+  channel?: string;
+  onNavigate?: () => void;
+} = {}) {
   return (
-    <div className="border-neutral-800 border-b p-2">
-      <Link to="/pulse" className={item}>
-        <span aria-hidden="true">🐝</span> Pulse
-      </Link>
-      <Link to="/inbox" className={item}>
-        <span aria-hidden="true">📥</span> Inbox
-        {inboxUnread > 0 ? (
-          <span className="ml-auto rounded-full bg-amber-500 px-1.5 font-semibold text-neutral-950 text-xs">
+    <Link
+      to="/chat"
+      onClick={onNavigate}
+      search={channel ? { channel } : {}}
+      className="hive-brand"
+      aria-label="CreatorHive home"
+    >
+      <img
+        className="hive-brand-mark"
+        src="/creatorhive-logo.png"
+        alt=""
+        width={40}
+        height={40}
+      />
+      <span>
+        Creator<span className="hive-brand-light">Hive</span>
+        <small>BUILD TOGETHER</small>
+      </span>
+    </Link>
+  );
+}
+
+/** Primary destinations; announcements stays between personal and community activity. */
+export function SurfacesNav({
+  inboxUnread = 0,
+  children,
+  onNavigate,
+}: {
+  inboxUnread?: number;
+  children: ReactNode;
+  onNavigate: () => void;
+}) {
+  return (
+    <nav className="hive-navigation" aria-label="Community">
+      <Link
+        onClick={onNavigate}
+        to="/inbox"
+        className="hive-nav-link"
+        activeProps={{ className: "is-active", "aria-current": "page" }}
+      >
+        <Inbox size={17} aria-hidden="true" />
+        <span>Inbox</span>
+        {inboxUnread > 0 && (
+          <span className="hive-unread">
             {inboxUnread > 9 ? "9+" : inboxUnread}
           </span>
-        ) : null}
+        )}
       </Link>
-      <Link to="/workflows" className={item}>
-        <span aria-hidden="true">⚡</span> Workflows
+      {children}
+      <Link
+        onClick={onNavigate}
+        to="/pulse"
+        className="hive-nav-link"
+        activeProps={{ className: "is-active", "aria-current": "page" }}
+      >
+        <Activity size={17} aria-hidden="true" />
+        <span>Pulse</span>
       </Link>
-      <Link to="/agents" className={item}>
-        <span aria-hidden="true">🤖</span> Agents
-      </Link>
-    </div>
+    </nav>
   );
 }

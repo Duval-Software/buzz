@@ -151,13 +151,14 @@ export function usePresence(selfPubkey: string): {
 
   // Expire stale entries on a timer rather than only on render: nobody
   // publishing means no re-render, and the list would stay stale forever.
-  const [, forceTick] = useState(0);
+  const [expiryTick, forceTick] = useState(0);
   useEffect(() => {
     const timer = setInterval(() => forceTick((n) => n + 1), 30_000);
     return () => clearInterval(timer);
   }, []);
 
   const statuses = useMemo(() => {
+    void expiryTick; // Recompute expiration even when no new heartbeat arrives.
     const now = Date.now();
     const out = new Map<string, PresenceStatus>();
     for (const [pubkey, entry] of seen) {
@@ -170,9 +171,9 @@ export function usePresence(selfPubkey: string): {
       out.set(selfPubkey.toLowerCase(), "online");
     }
     return out;
-    // forceTick is intentionally in the dependency list: it is what re-runs
+    // expiryTick is intentionally in the dependency list: it is what re-runs
     // the expiry sweep on a quiet relay.
-  }, [seen, selfPubkey]);
+  }, [seen, selfPubkey, expiryTick]);
 
   const statusOf = useCallback(
     (pubkey: string): PresenceStatus =>

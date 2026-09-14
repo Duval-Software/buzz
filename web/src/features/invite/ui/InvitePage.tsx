@@ -1,4 +1,10 @@
-import buzzAppIcon from "@/assets/app-icon@3x.png";
+import { Monitor, FileText } from "lucide-react";
+import { CommunityDialog } from "@/features/surfaces/ui/CommunityDialog";
+import { useNavigate } from "@tanstack/react-router";
+import { loginAccount, registerAccount } from "@/features/identity/accounts";
+import { CredentialForm } from "@/features/identity/ui/CredentialForm";
+import { useMembership } from "@/features/identity/use-identity";
+import { HiveBrand } from "@/features/surfaces/ui/SurfacesNav";
 import { claimInviteInBrowser } from "@/features/invite/invite-api";
 import {
   BUZZ_RELEASES_URL,
@@ -6,8 +12,7 @@ import {
   detectBuzzDownloadPlatform,
   resolveBuzzDownloadUrlForPlatform,
 } from "@/shared/lib/buzz-download";
-import { hasNip07Provider } from "@/shared/lib/nostr-signer";
-import { relayWsUrl } from "@/shared/lib/relay-url";
+import { relayHttpBaseUrl, relayWsUrl } from "@/shared/lib/relay-url";
 import { Button } from "@/shared/ui/button";
 import * as React from "react";
 import Markdown from "react-markdown";
@@ -40,6 +45,10 @@ function inviteClaimErrorMessage(message: string): string {
 
 /** Landing page for a community invite link (`/invite/<code>`). */
 export function InvitePage({ code }: { code: string }) {
+  const navigate = useNavigate();
+  const { identity, signOut, recheck } = useMembership();
+  const [mode, setMode] = React.useState<"login" | "register">("register");
+  const [policyError, setPolicyError] = React.useState(false);
   const relay = relayWsUrl();
   const host = relay.replace(/^wss?:\/\//, "");
   const [policy, setPolicy] = React.useState<JoinPolicy | null | undefined>(
@@ -80,37 +89,52 @@ export function InvitePage({ code }: { code: string }) {
   }, []);
 
   React.useEffect(() => {
-    fetch("/api/join-policy")
+    fetch(`${relayHttpBaseUrl()}/api/join-policy`, {
+      signal: AbortSignal.timeout(15_000),
+    })
       .then(async (response) => {
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const config = (await response.json()) as { policy?: JoinPolicy };
         setPolicy(config.policy ?? null);
       })
-      .catch(() => setPolicy(undefined));
+      .catch(() => setPolicyError(true));
   }, []);
 
   const acceptPolicy = async (): Promise<string | undefined> => {
     if (!policy) return undefined;
-    const response = await fetch("/api/invites/accept-policy", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        code,
-        policy_version: policy.version,
-        age_confirmed: ageConfirmed,
-      }),
-    });
+    const response = await fetch(
+      `${relayHttpBaseUrl()}/api/invites/accept-policy`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: AbortSignal.timeout(15_000),
+        body: JSON.stringify({
+          code,
+          policy_version: policy.version,
+          age_confirmed: ageConfirmed,
+        }),
+      },
+    );
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     return ((await response.json()) as { receipt: string }).receipt;
   };
 
   const openInvite = async () => {
     setOpening(true);
+    setBrowserJoinError(null);
     try {
       const receipt = await acceptPolicy();
       const query = new URLSearchParams({ relay, code });
       if (receipt) query.set("policy_receipt", receipt);
       window.location.href = `buzz://join?${query.toString()}`;
+    } catch (error) {
+      setBrowserJoinError(
+        inviteClaimErrorMessage(
+          error instanceof Error
+            ? error.message
+            : "Could not open this invite.",
+        ),
+      );
     } finally {
       setOpening(false);
     }
@@ -122,7 +146,9 @@ export function InvitePage({ code }: { code: string }) {
     try {
       const receipt = await acceptPolicy();
       await claimInviteInBrowser(code, receipt);
-      window.location.assign("/");
+      recheck();
+      // Keep the unlocked account in memory across the route transition.
+      await navigate({ to: "/chat" });
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Could not claim this invite.";
@@ -132,7 +158,7 @@ export function InvitePage({ code }: { code: string }) {
     }
   };
 
-  const browserSigningAvailable = hasNip07Provider();
+  const browserSigningAvailable = !!identity;
   const disabled =
     policy === undefined ||
     opening ||
@@ -153,7 +179,6 @@ export function InvitePage({ code }: { code: string }) {
     setDocument({ title, markdown });
   const closeMacChoice = React.useCallback(() => {
     setShowMacChoice(false);
-    window.setTimeout(() => downloadTriggerRef.current?.focus());
   }, []);
   const chooseMacDownload = async (
     event: React.MouseEvent<HTMLAnchorElement>,
@@ -175,34 +200,73 @@ export function InvitePage({ code }: { code: string }) {
     }
   };
 
-  React.useEffect(() => {
-    if (!showMacChoice) return;
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") closeMacChoice();
-    };
-    window.document.addEventListener("keydown", closeOnEscape);
-    return () => window.document.removeEventListener("keydown", closeOnEscape);
-  }, [closeMacChoice, showMacChoice]);
-
   return (
-    <div
-      className="flex flex-1 flex-col items-center justify-center px-4 py-16 text-center"
-      style={{
-        backgroundImage: "linear-gradient(180deg, #D7D72E 0%, #D7E7F6 100%)",
-      }}
-    >
-      <div className="w-full max-w-xl space-y-4">
-        <div className="flex w-full flex-col items-center rounded-3xl bg-white px-6 py-10 sm:px-12 sm:py-12">
-          <div
-            className="h-12 w-12 overflow-hidden bg-black"
-            style={{ borderRadius: "22.37%" }}
-          >
-            <img alt="Buzz" className="h-full w-full" src={buzzAppIcon} />
-          </div>
-          <h1 className="mt-4 text-2xl font-semibold tracking-tight text-black">
-            You&apos;re invited to
-          </h1>
-          <p className="mt-9 font-mono text-lg text-black/70">{host}</p>
+    <div className="hive-app hive-entry">
+      <div className="space-y-4">
+        <div className="w-full">
+          <HiveBrand />
+          <p className="hive-entry-kicker">An invitation to build together</p>
+          <h1>You’re invited to CreatorHive</h1>
+          <p className="break-all text-sm text-neutral-400">{host}</p>
+          {identity ? (
+            <div className="mt-6 space-y-2">
+              <p>
+                {identity.username
+                  ? `Signed in as @${identity.username}`
+                  : "Using your existing community profile"}
+              </p>
+              <button
+                className="hive-entry-switch"
+                disabled={joiningBrowser}
+                type="button"
+                onClick={async () => {
+                  try {
+                    await signOut();
+                  } catch (error) {
+                    setBrowserJoinError(
+                      error instanceof Error
+                        ? error.message
+                        : "Could not sign out.",
+                    );
+                  }
+                }}
+              >
+                Sign in to a different account
+              </button>
+            </div>
+          ) : (
+            <>
+              <p className="mt-3 text-sm text-neutral-400">
+                Create an account or sign in, then accept your invitation.
+              </p>
+              <CredentialForm
+                key={mode}
+                mode={mode}
+                onSubmit={async (name, password) => {
+                  if (mode === "register")
+                    await registerAccount(name, password);
+                  else await loginAccount(name, password);
+                }}
+              />
+              <button
+                type="button"
+                className="hive-entry-switch"
+                onClick={() =>
+                  setMode(mode === "register" ? "login" : "register")
+                }
+              >
+                {mode === "register"
+                  ? "Already a member? Sign in"
+                  : "New here? Create an account"}
+              </button>
+            </>
+          )}
+          {policyError && (
+            <p role="alert" className="mt-4 text-sm text-red-300">
+              Could not load this community’s join requirements. Reopen your
+              invite to try again.
+            </p>
+          )}
 
           <div
             className={`grid w-full max-w-md overflow-hidden transition-[grid-template-rows,margin,opacity,transform] duration-[220ms] [transition-timing-function:cubic-bezier(0.23,1,0.32,1)] motion-reduce:transition-none ${
@@ -228,7 +292,7 @@ export function InvitePage({ code }: { code: string }) {
           <div className="mt-9 w-full max-w-md space-y-2">
             {browserSigningAvailable ? (
               <Button
-                className="h-10 w-full bg-black text-white hover:bg-black/90 focus-visible:ring-black disabled:cursor-not-allowed disabled:bg-black/30 disabled:text-white/70"
+                className="hive-primary-button w-full"
                 disabled={disabled}
                 onClick={joinInBrowser}
               >
@@ -238,11 +302,7 @@ export function InvitePage({ code }: { code: string }) {
             {policy === null ? (
               <Button
                 asChild
-                className={`h-10 w-full ${
-                  browserSigningAvailable
-                    ? "border border-black bg-white text-black hover:bg-black/5"
-                    : "bg-black text-white hover:bg-black/90 focus-visible:ring-black"
-                }`}
+                className="h-10 w-full border border-neutral-600 bg-neutral-900 text-neutral-200 hover:bg-neutral-800"
               >
                 <a
                   href={`buzz://join?relay=${encodeURIComponent(relay)}&code=${encodeURIComponent(code)}`}
@@ -252,11 +312,7 @@ export function InvitePage({ code }: { code: string }) {
               </Button>
             ) : (
               <Button
-                className={`h-10 w-full disabled:cursor-not-allowed disabled:bg-black/30 disabled:text-white/70 ${
-                  browserSigningAvailable
-                    ? "border border-black bg-white text-black hover:bg-black/5"
-                    : "bg-black text-white hover:bg-black/90 focus-visible:ring-black"
-                }`}
+                className="h-10 w-full border border-neutral-600 bg-neutral-900 text-neutral-200 hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-50"
                 disabled={disabled}
                 onClick={openInvite}
               >
@@ -264,18 +320,18 @@ export function InvitePage({ code }: { code: string }) {
               </Button>
             )}
             {browserJoinError ? (
-              <p className="text-sm text-red-700" role="alert">
+              <p className="text-sm text-red-300" role="alert">
                 {browserJoinError}
               </p>
             ) : null}
           </div>
         </div>
-        <p className="flex h-[3.125rem] items-center justify-center rounded-2xl bg-white text-sm text-black/60">
+        <p className="flex flex-wrap items-center justify-center gap-y-1 py-4 text-sm text-neutral-400">
           Don&apos;t have the app?{" "}
           <a
             aria-expanded={needsMacChoice ? showMacChoice : undefined}
             aria-haspopup={needsMacChoice ? "dialog" : undefined}
-            className="ml-1 font-medium text-black underline-offset-4 hover:text-black/70 hover:underline focus-visible:underline"
+            className="ml-1 font-medium text-neutral-200 underline-offset-4 hover:text-white hover:underline focus-visible:underline"
             href={downloadUrl}
             ref={downloadTriggerRef}
             rel="noreferrer"
@@ -292,38 +348,17 @@ export function InvitePage({ code }: { code: string }) {
       </div>
 
       {showMacChoice && (
-        <div
-          aria-label="Which Mac do you have?"
-          aria-modal="true"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 text-left"
-          role="dialog"
-          onMouseDown={(event) => {
-            if (event.currentTarget === event.target) closeMacChoice();
-          }}
+        <CommunityDialog
+          label="Which Mac do you have?"
+          description="Choose the download for your Mac."
+          icon={Monitor}
+          onClose={closeMacChoice}
         >
-          <div className="w-full max-w-lg rounded-3xl bg-white p-7 text-black shadow-xl sm:p-9">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h2 className="text-2xl font-semibold tracking-tight">
-                  Which Mac do you have?
-                </h2>
-                <p className="mt-2 text-sm text-black/60">
-                  Choose based on when your Mac was released.
-                </p>
-              </div>
-              <button
-                aria-label="Close"
-                className="text-2xl leading-none text-black/60 hover:text-black"
-                type="button"
-                onClick={closeMacChoice}
-              >
-                ×
-              </button>
-            </div>
-            <div className="mt-6 grid gap-3">
+          <div>
+            <div className="grid gap-3">
               <a
                 aria-disabled={choosingMacDownload}
-                className="rounded-2xl border border-black p-5 text-black no-underline hover:bg-black hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black aria-disabled:pointer-events-none aria-disabled:opacity-50"
+                className="hive-dialog-option aria-disabled:pointer-events-none aria-disabled:opacity-50"
                 href={BUZZ_RELEASES_URL}
                 onClick={(event) =>
                   void chooseMacDownload(event, {
@@ -339,7 +374,7 @@ export function InvitePage({ code }: { code: string }) {
               </a>
               <a
                 aria-disabled={choosingMacDownload}
-                className="rounded-2xl border border-black p-5 text-black no-underline hover:bg-black hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black aria-disabled:pointer-events-none aria-disabled:opacity-50"
+                className="hive-dialog-option aria-disabled:pointer-events-none aria-disabled:opacity-50"
                 href={BUZZ_RELEASES_URL}
                 onClick={(event) =>
                   void chooseMacDownload(event, {
@@ -360,38 +395,19 @@ export function InvitePage({ code }: { code: string }) {
               “Processor: Intel” means Older Mac.
             </p>
           </div>
-        </div>
+        </CommunityDialog>
       )}
 
       {document && (
-        <div
-          aria-label={document.title}
-          aria-modal="true"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 text-left"
-          role="dialog"
-          onMouseDown={(event) => {
-            if (event.currentTarget === event.target) setDocument(null);
-          }}
+        <CommunityDialog
+          label={document.title}
+          icon={FileText}
+          onClose={() => setDocument(null)}
         >
-          <div className="max-h-[85vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-6 text-black shadow-xl sm:p-8">
-            <div className="mb-6 flex items-start justify-between gap-4">
-              <h2 className="text-xl font-semibold">{document.title}</h2>
-              <button
-                aria-label="Close"
-                className="text-2xl leading-none text-black/60 hover:text-black"
-                type="button"
-                onClick={() => setDocument(null)}
-              >
-                ×
-              </button>
-            </div>
-            <div className="prose prose-sm max-w-none">
-              <Markdown remarkPlugins={[remarkGfm]}>
-                {document.markdown}
-              </Markdown>
-            </div>
+          <div className="prose prose-sm max-w-none">
+            <Markdown remarkPlugins={[remarkGfm]}>{document.markdown}</Markdown>
           </div>
-        </div>
+        </CommunityDialog>
       )}
     </div>
   );

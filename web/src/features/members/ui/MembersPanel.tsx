@@ -1,3 +1,5 @@
+import { ChannelPublishing } from "@/features/community/ChannelPublishing";
+import type { Channel } from "@/features/chat/use-chat";
 import type { ChannelMember } from "@/features/members/use-members";
 import type { PresenceStatus } from "@/features/chat/use-presence";
 import { PresenceDot } from "@/features/chat/ui/PresenceDot";
@@ -11,7 +13,7 @@ import { useProfile, useNames } from "@/features/profile/use-profiles";
  * not hidden in a separate tab. They are the same list with an honest badge,
  * because "who is in this room" includes the ones that answer at 4am.
  */
-function MemberRow({
+export function MemberRow({
   member,
   statusOf,
 }: {
@@ -23,17 +25,20 @@ function MemberRow({
   const name = names(member.pubkey);
   return (
     <li className="flex items-center gap-2 rounded-lg px-2 py-1.5">
-      <AvatarDisc pubkey={member.pubkey} name={name} />
-      <span className="min-w-0 flex-1 truncate text-sm">{name}</span>
+      <AvatarDisc pubkey={member.pubkey} name={name} size={32} />
+      <span className="min-w-0 flex-1 truncate text-sm">
+        {name}
+        {!profile?.displayName ? <small>No display name set</small> : null}
+      </span>
       <PresenceDot status={statusOf(member.pubkey)} />
       {profile?.bot ? (
         <span className="shrink-0 rounded border border-neutral-700 px-1 text-neutral-500 text-xs">
           agent
         </span>
       ) : null}
-      {member.role === "owner" ? (
+      {member.role !== "member" ? (
         <span className="shrink-0 rounded border border-amber-800 px-1 text-amber-400 text-xs">
-          owner
+          {member.role}
         </span>
       ) : null}
     </li>
@@ -41,10 +46,12 @@ function MemberRow({
 }
 
 export function MembersPanel({
+  channel,
   members,
   statusOf,
   onClose,
 }: {
+  channel?: Channel;
   members: ChannelMember[];
   statusOf: (pubkey: string) => PresenceStatus;
   onClose: () => void;
@@ -60,12 +67,13 @@ export function MembersPanel({
     .sort(byName);
 
   return (
-    <aside className="flex w-full shrink-0 flex-col border-neutral-800 bg-neutral-950 max-md:fixed max-md:inset-0 max-md:z-40 md:w-72 md:border-l">
+    <aside className="hive-panel flex w-full shrink-0 flex-col border-neutral-800 bg-neutral-950 max-md:fixed max-md:inset-0 max-md:z-40 md:border-l">
       <header className="flex items-center justify-between gap-2 border-neutral-800 border-b px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
         <div>
           <h2 className="font-semibold text-sm">Members</h2>
           <p className="text-neutral-500 text-xs">
-            {members.length} in this channel · {online.length} around
+            {members.length} {channel ? "in this channel" : "in the community"}{" "}
+            · {online.length} around
           </p>
         </div>
         <button
@@ -77,16 +85,32 @@ export function MembersPanel({
         </button>
       </header>
       <ul className="flex-1 overflow-y-auto p-2">
+        {members.length === 0 && (
+          <li className="p-2 text-neutral-500 text-sm">
+            The verified member list is not available yet.
+          </li>
+        )}
         {online.map((member) => (
           <MemberRow key={member.pubkey} member={member} statusOf={statusOf} />
         ))}
         {offline.length > 0 && online.length > 0 ? (
-          <li className="px-2 pt-2 pb-1 text-neutral-600 text-xs">offline</li>
+          <li className="px-2 pt-2 pb-1 text-neutral-600 text-xs">Offline</li>
         ) : null}
         {offline.map((member) => (
           <MemberRow key={member.pubkey} member={member} statusOf={statusOf} />
         ))}
       </ul>
+      {channel ? (
+        <ChannelPublishing
+          key={channel.id}
+          channel={channel}
+          members={members}
+        />
+      ) : null}
+      <p className="hive-panel-note">
+        Members include people, agents, and test identities. Presence shows who
+        has recently connected.
+      </p>
     </aside>
   );
 }

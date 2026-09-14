@@ -170,7 +170,11 @@ export function queryEvents(
       if (!settled) {
         settled = true;
         clearTimeout(timeout);
-        resolve(events);
+        reject(
+          new Error(
+            "The connection closed before the relay finished the query. Please try again.",
+          ),
+        );
       }
     });
   });

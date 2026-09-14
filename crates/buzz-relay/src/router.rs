@@ -92,6 +92,15 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             "/operator/communities/transfer",
             post(api::operator::transfer_community),
         )
+        // Credential exchange is HTTP-only: passwords must never enter the event log.
+        .route("/api/accounts/register", post(api::accounts::register))
+        .route("/api/accounts/login", post(api::accounts::login))
+        .route("/api/accounts/logout", post(api::accounts::logout))
+        .route("/api/accounts/resolve", post(api::accounts::resolve))
+        .route(
+            "/api/accounts/password",
+            post(api::accounts::change_password),
+        )
         // Relay invites: mint (owner/admin) + claim (membership-gate exempt)
         .route("/api/invites", post(api::invites::mint_invite))
         .route("/api/join-policy", get(api::invites::join_policy))
@@ -187,6 +196,10 @@ pub fn build_router(state: Arc<AppState>) -> Router {
     }
 
     merged
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            api::accounts::session_guard,
+        ))
         .layer(middleware::from_fn(track_metrics))
         .layer(http_trace_layer())
         .layer(build_cors_layer(&state.config.cors_origins))

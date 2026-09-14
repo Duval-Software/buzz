@@ -162,7 +162,11 @@ impl RelayInfo {
             pubkey: None,
             contact: None,
             supported_nips,
-            supported_extensions: Some(vec!["nip-er".to_string()]),
+            supported_extensions: Some(vec![
+                "nip-er".to_string(),
+                "buzz-channel-posting-policy-v1".to_string(),
+                "creatorhive-accounts-v1".to_string(),
+            ]),
             push: None,
             software: "https://github.com/block/buzz".to_string(),
             version: env!("CARGO_PKG_VERSION").to_string(),
@@ -393,6 +397,12 @@ mod tests {
     fn build_advertises_buzz_repository_url() {
         let info = RelayInfo::build(None, None, false, DEFAULT_MAX_FRAME_BYTES, None);
         assert_eq!(info.software, "https://github.com/block/buzz");
+        assert!(info
+            .supported_extensions
+            .as_ref()
+            .is_some_and(|extensions| extensions
+                .iter()
+                .any(|extension| extension == "buzz-channel-posting-policy-v1")));
     }
 
     #[test]

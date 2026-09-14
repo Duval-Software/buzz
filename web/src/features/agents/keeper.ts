@@ -6,7 +6,7 @@
  * browser actually called and no CORS is involved.
  *
  * Key policy, enforced server-side and mirrored in the UI: members bring
- * their own Anthropic API key. Only the operator's agents may run on the
+ * their own provider API key. Only the operator's agents may run on the
  * platform key. The "echo" model is keyless: it tests the whole pipeline
  * without spending a token.
  */
@@ -34,12 +34,50 @@ export type CloudAgent = {
 export type CreateAgentInput = {
   name: string;
   system_prompt: string;
-  model: "echo" | "haiku" | "sonnet";
+  model: string;
   respond_to: "mentions" | "owner-only";
   api_key: string;
   /** Set to promote an existing (desktop) agent instead of minting a key. */
   nsec?: string;
 };
+
+export type CloudModel = {
+  id: string;
+  provider: "echo" | "anthropic" | "openrouter";
+  label: string;
+};
+
+// Old keepers do not advertise a catalog. Preserve only their known models.
+export const legacyCloudModels: CloudModel[] = [
+  { id: "echo", provider: "echo", label: "Echo (free test)" },
+  { id: "haiku", provider: "anthropic", label: "Haiku" },
+  { id: "sonnet", provider: "anthropic", label: "Sonnet" },
+];
+
+/** Show only server-supported providers; never send an OpenRouter key to an old keeper. */
+export async function listCloudModels(): Promise<CloudModel[]> {
+  try {
+    const response = await fetch("/keeper/health", {
+      cache: "no-store",
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!response.ok) return legacyCloudModels;
+    const body = await response.json();
+    if (!Array.isArray(body.models)) return legacyCloudModels;
+    return body.models.filter(
+      (item: CloudModel) =>
+        item &&
+        typeof item.id === "string" &&
+        item.id.length > 0 &&
+        item.id.length <= 160 &&
+        typeof item.label === "string" &&
+        item.label.length <= 160 &&
+        ["echo", "anthropic", "openrouter"].includes(item.provider),
+    );
+  } catch {
+    return legacyCloudModels;
+  }
+}
 
 async function keeperFetch(
   path: string,
@@ -89,6 +127,21 @@ export async function listCloudAgents(): Promise<CloudAgent[]> {
 export async function createCloudAgent(
   input: CreateAgentInput,
 ): Promise<CloudAgent> {
+  const model = (await listCloudModels()).find(
+    (model) => model.id === input.model,
+  );
+  if (!model)
+    throw new Error(
+      "This model is not available on the cloud server. Refresh and choose another model.",
+    );
+  if (
+    model.provider === "openrouter" &&
+    (!input.api_key.trim().startsWith("sk-or-") ||
+      input.api_key.trim().length <= 6 ||
+      /\s/.test(input.api_key.trim()) ||
+      input.api_key.trim().length > 512)
+  )
+    throw new Error("Enter your own OpenRouter API key (sk-or-…).");
   const path = input.nsec ? "/keeper/agents/adopt" : "/keeper/agents";
   const agent = await orThrow<CloudAgent>(
     await keeperFetch(path, "POST", input),

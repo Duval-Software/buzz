@@ -26,13 +26,13 @@ export function AvatarDisc({
   return (
     <span
       aria-hidden="true"
-      className="inline-flex shrink-0 select-none items-center justify-center rounded-full font-semibold"
+      className="inline-flex shrink-0 select-none items-center justify-center rounded-xl font-semibold"
       style={{
-        width: size,
-        height: size,
-        fontSize: size * 0.5,
-        backgroundColor: `hsl(${hue} 45% 28%)`,
-        color: `hsl(${hue} 80% 85%)`,
+        width: `${size / 16}rem`,
+        height: `${size / 16}rem`,
+        fontSize: `${size / 32}rem`,
+        backgroundColor: `hsl(${hue} 22% 26%)`,
+        color: `hsl(${hue} 38% 82%)`,
       }}
     >
       {letter}

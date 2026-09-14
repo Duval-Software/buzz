@@ -1,0 +1,828 @@
+/* Shared member app layout and tokens. Route-specific styles inherit these. */
+.hive-app.hive-chat {
+  --chat-bg: #1b1d1d;
+  --chat-side: #252822;
+  --chat-surface: #292e31;
+  --chat-hover: #32383b;
+  --chat-text: #e4e8e7;
+  --chat-muted: #a5afb3;
+  --chat-accent: #e8bb71;
+  --chat-selection: #e8bb7117;
+  --hive-border: #b6c6cd19;
+  --color-neutral-950: var(--chat-bg);
+  --color-neutral-900: var(--chat-side);
+  --color-neutral-800: var(--chat-surface);
+  --color-neutral-700: #596469;
+  --color-neutral-600: var(--chat-muted);
+  --color-neutral-500: var(--chat-muted);
+  --color-neutral-400: var(--chat-muted);
+  --color-neutral-300: var(--chat-text);
+  --color-neutral-200: var(--chat-text);
+  --color-neutral-100: var(--chat-text);
+  --color-neutral-50: var(--chat-text);
+  --color-amber-400: var(--chat-accent);
+  --color-amber-300: var(--chat-accent);
+  --color-amber-200: var(--chat-accent);
+  color: var(--chat-text);
+  background: linear-gradient(155deg, #4a4725 0%, #303428 36%, #14212b 100%);
+  padding: 12px 12px 12px 0;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Inter Variable", "Segoe UI", sans-serif;
+  letter-spacing: -0.01em;
+}
+.light .hive-chat {
+  --chat-bg: #faf9f6;
+  --chat-side: #f0efeb;
+  --chat-surface: #eae9e4;
+  --chat-hover: #e2e1db;
+  --chat-text: #292b2b;
+  --chat-muted: #62685f;
+  --chat-accent: #896015;
+  --chat-selection: #ad7c1510;
+  --hive-border: #28282016;
+  --color-neutral-700: #989d94;
+  --color-amber-950: #f3e6ca;
+  background: linear-gradient(155deg, #e7dfbe 0%, #e1e5d8 45%, #dce6eb 100%);
+  color-scheme: light;
+}
+.hive-chat .hive-eyebrow {
+  color: var(--chat-muted);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1.5;
+  letter-spacing: 0.035em;
+}
+.hive-chat .hive-chat-sidebar {
+  width: 15rem;
+  background: transparent;
+  border-right: 0;
+  padding: 0 6px;
+}
+.hive-chat .hive-brand {
+  padding: 10px 14px;
+  gap: 8px;
+  color: var(--chat-text);
+}
+.hive-chat .hive-brand-light {
+  font-weight: 600;
+}
+.hive-chat .hive-brand small {
+  display: none;
+}
+.hive-chat .hive-brand-mark {
+  width: 2.125rem;
+  height: 2.125rem;
+}
+.hive-chat .hive-chat-search {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0 10px 8px;
+  padding: 7px 8px;
+  border: 1px solid var(--hive-border);
+  border-radius: 5px;
+  background: #ffffff08;
+  color: var(--chat-muted);
+  text-align: left;
+  font-size: 0.75rem;
+}
+.hive-chat .hive-chat-search:hover {
+  color: var(--chat-text);
+  border-color: var(--chat-muted);
+}
+.hive-chat .hive-navigation {
+  padding: 0 8px 8px;
+}
+.hive-chat .hive-navigation > .hive-eyebrow {
+  display: none;
+}
+.hive-chat .hive-nav-link {
+  min-height: 2rem;
+  padding: 4px 8px;
+  gap: 10px;
+  font-size: 0.8125rem;
+  border-radius: 5px;
+  color: var(--chat-muted);
+}
+.hive-chat .hive-nav-link svg,
+.hive-chat .hive-nav-link.is-active svg {
+  color: inherit;
+}
+.hive-chat .hive-nav-link:hover {
+  background: var(--chat-hover);
+  color: var(--chat-text);
+}
+.hive-chat .hive-nav-link:is(.is-active, [aria-current="page"]) {
+  background: var(--chat-selection);
+  color: var(--chat-accent);
+  box-shadow: none;
+}
+.hive-chat .hive-nav-caption {
+  color: var(--chat-muted);
+}
+.hive-chat .hive-channel-list {
+  border: 0;
+  padding: 4px 8px 10px;
+}
+.hive-chat .hive-channel-list > .hive-eyebrow {
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 0 8px 4px;
+}
+
+.hive-chat .hive-connection {
+  color: var(--chat-muted);
+  font-size: 0.625rem;
+}
+.hive-chat .hive-sidebar-section > button {
+  min-height: 2rem;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.8125rem;
+}
+.hive-chat .hive-sidebar-section > button:hover {
+  background: var(--chat-hover);
+}
+.hive-chat .hive-sidebar-section > button[aria-current] {
+  background: var(--chat-hover);
+  color: var(--chat-text);
+  box-shadow: none;
+}
+.hive-chat .hive-sidebar-section > button .bg-amber-500 {
+  border-radius: 4px;
+  font-size: 0.625rem;
+  color: #29241b;
+}
+.hive-chat .hive-dm-heading {
+  padding: 14px 8px 4px;
+}
+.hive-chat .hive-dm-heading > span {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.035em;
+}
+.hive-chat .hive-dm-heading > button {
+  border: 0;
+  font-size: 1rem;
+}
+.hive-chat .hive-dm-name {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+}
+.hive-chat .hive-dm-empty {
+  color: var(--chat-muted);
+  font-size: 0.6875rem;
+}
+.hive-sidebar-account {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding-right: 8px;
+  border-top: 1px solid var(--hive-border);
+}
+.hive-sidebar-account > button:last-child {
+  flex-shrink: 0;
+  color: var(--chat-muted);
+}
+.hive-sidebar-account > button:last-child:hover {
+  background: var(--chat-hover);
+  color: var(--chat-text);
+}
+.hive-chat .hive-profile-button {
+  min-width: 0;
+  flex: 1;
+  width: auto;
+  border: 0;
+  padding: 8px;
+  gap: 8px;
+  color: var(--chat-text);
+  font-size: 0.75rem;
+}
+.hive-chat .hive-profile-button:hover {
+  background: var(--chat-hover);
+}
+.hive-chat .hive-profile-button small {
+  color: var(--chat-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hive-chat .hive-profile-button > svg:last-child {
+  margin-left: auto;
+  flex-shrink: 0;
+  color: var(--chat-muted);
+}
+.hive-chat .rounded-xl {
+  border-radius: 8px;
+}
+.hive-chat-workspace {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--chat-bg);
+  box-shadow: 0 0 0 1px #ffffff08;
+  display: flex;
+  flex-direction: column;
+}
+.hive-chat-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+.hive-chat-body > main {
+  min-height: 0;
+}
+.hive-chat .hive-chat-header {
+  min-height: 3.5rem;
+  padding: 0.5rem 1rem;
+  flex-shrink: 0;
+  background: var(--chat-bg);
+  border-color: var(--hive-border);
+}
+.hive-chat .hive-chat-header h1 {
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+.hive-chat .hive-chat-header p {
+  color: var(--chat-muted);
+  font-size: 0.75rem;
+}
+.hive-chat .hive-chat-header > button {
+  padding: 8px;
+  border: 0;
+  border-radius: 5px;
+}
+.hive-chat .hive-chat-header > button:hover,
+.hive-chat .hive-chat-header > button[aria-pressed="true"] {
+  background: var(--chat-hover);
+}
+.hive-chat .hive-timeline {
+  padding: 0.75rem 1rem 0.5rem;
+  min-height: 0;
+}
+.hive-chat-date {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  color: var(--chat-muted);
+  font-size: 0.6875rem;
+  line-height: 1.5;
+  margin: 4px 0 12px;
+}
+.hive-chat-date::before,
+.hive-chat-date::after {
+  content: "";
+  height: 1px;
+  background: var(--hive-border);
+  flex: 1;
+}
+.hive-chat .hive-message-group {
+  padding-left: 2.5rem;
+  margin-bottom: 0.875rem;
+}
+.hive-chat .hive-message-meta {
+  min-height: 20px;
+  margin-bottom: 0;
+  flex-wrap: wrap;
+}
+.hive-chat .hive-message-meta > span:nth-child(2) {
+  font-size: 0.8125rem;
+}
+.hive-chat .hive-message-meta time {
+  color: var(--chat-muted);
+  font-size: 0.625rem;
+}
+.hive-chat .hive-message .message-markdown {
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+.hive-app.hive-chat .message-markdown p {
+  color: var(--chat-text);
+}
+.hive-app.hive-chat
+  .message-markdown
+  :is(a, span.text-amber-400, span.text-amber-200) {
+  color: var(--chat-accent);
+}
+.hive-app.hive-chat .message-markdown pre {
+  background: var(--chat-side);
+  border-color: var(--hive-border);
+  border-radius: 5px;
+}
+.hive-app.hive-chat .message-markdown code {
+  background: var(--chat-surface);
+  color: var(--chat-text);
+}
+.hive-app.hive-chat .message-markdown pre code {
+  background: none;
+}
+.hive-app.hive-chat .message-markdown :is(th, td) {
+  border-color: var(--hive-border);
+}
+.hive-chat .hive-message img {
+  border-radius: 6px;
+}
+.hive-chat .hive-message a > img {
+  max-height: 280px;
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
+}
+.hive-chat .hive-message button.rounded-full {
+  border-radius: 4px;
+}
+.hive-chat .hive-message .text-amber-400 {
+  color: var(--chat-accent);
+}
+.hive-chat .hive-message-actions {
+  border-radius: 5px;
+  border-color: var(--hive-border);
+  background: var(--chat-side);
+}
+.hive-chat .hive-message-actions button:hover {
+  background: var(--chat-hover);
+}
+.hive-chat .hive-composer {
+  padding: 0.5rem 1rem max(0.625rem, env(safe-area-inset-bottom));
+  background: var(--chat-bg);
+}
+.hive-chat .hive-composer-field {
+  min-height: 2.75rem;
+  border-radius: 0.75rem;
+  border-color: var(--hive-border);
+  background: var(--chat-surface);
+  padding: 3px 6px;
+}
+.hive-chat .hive-composer-field:focus-within {
+  border-color: var(--chat-accent);
+}
+.hive-chat .hive-composer-field > input {
+  color: var(--chat-text);
+}
+/* The composer owns the focus border; its text input is not a second field. */
+.hive-chat .hive-composer-field > input:not([type="file"]):focus-visible {
+  outline: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .hive-message.is-outgoing {
+    animation: hive-message-send 240ms ease-out;
+  }
+}
+@keyframes hive-message-send {
+  from {
+    opacity: 0.5;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.hive-chat .hive-composer-field > button {
+  border-radius: 4px;
+}
+.hive-chat .hive-composer-field > button[type="submit"] {
+  background: transparent;
+  color: var(--chat-accent);
+  padding: 8px;
+}
+.hive-chat .hive-composer-field > button[type="submit"] > span {
+  display: none;
+}
+.hive-chat .hive-composer-field > button[type="submit"] > svg {
+  transform: rotate(90deg);
+}
+.hive-chat .hive-composer-hint {
+  color: var(--chat-muted);
+  font-size: 0.625rem;
+}
+.hive-chat-context {
+  width: 14rem;
+  flex-shrink: 0;
+  padding: 14px 12px;
+  background: var(--chat-side);
+  border-left: 1px solid var(--hive-border);
+  overflow-y: auto;
+}
+.hive-chat-context h2 {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0 0 2px;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+.hive-chat .hive-chat-context h2 span {
+  color: var(--chat-muted);
+  font-size: 0.75rem;
+  font-weight: 400;
+}
+.hive-chat-context p:not(.hive-eyebrow),
+.hive-chat .hive-chat-context li small {
+  color: var(--chat-muted);
+  font-size: 0.75rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+/* The full Members panel retains the missing-profile explanation. */
+.hive-chat .hive-chat-context li small {
+  display: none;
+}
+.hive-chat-context section {
+  margin-top: 16px;
+}
+.hive-chat-context ul {
+  margin: 6px -4px 0;
+}
+.hive-chat-context li {
+  margin-bottom: 0;
+  padding: 4px;
+  min-height: 2.5rem;
+}
+.hive-chat-context footer {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--hive-border);
+}
+.hive-chat-context .hive-context-link {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 6px;
+  color: var(--chat-accent);
+  font-size: 0.75rem;
+}
+.hive-roster-empty {
+  margin-top: 24px;
+}
+.hive-chat .hive-panel,
+.hive-chat .hive-panel > header {
+  background: var(--chat-side);
+  border-color: var(--hive-border);
+}
+.hive-chat .hive-panel > header {
+  min-height: 3.5rem;
+  padding: 0.5rem 1rem;
+}
+.hive-chat .hive-panel > ul {
+  padding: 8px;
+}
+.hive-chat .hive-panel > ul > li {
+  padding: 6px 8px;
+}
+.hive-chat .hive-thread > div {
+  padding: 16px;
+}
+.hive-chat .hive-thread article + article {
+  margin-top: 12px;
+}
+.hive-chat .hive-thread form {
+  background: var(--chat-side);
+}
+.hive-chat .hive-panel-note,
+.hive-chat .hive-panel > ul > li small {
+  color: var(--chat-muted);
+}
+.hive-chat .hive-announcement-note {
+  color: var(--chat-accent);
+}
+.hive-chat .hive-channel-publishing {
+  border-color: var(--hive-border);
+}
+.hive-chat .hive-channel-publishing button,
+.hive-chat .hive-channel-publishing select {
+  background: var(--chat-surface);
+  color: var(--chat-text);
+  border-color: var(--hive-border);
+}
+@media (max-width: 1199px) {
+  .hive-chat-context {
+    display: none;
+  }
+}
+@media (min-width: 768px) and (max-width: 1000px) {
+  .hive-chat .hive-chat-sidebar {
+    width: 12rem;
+  }
+  .hive-chat-body:has(> .hive-panel) > main {
+    display: none;
+  }
+  .hive-chat .hive-panel {
+    flex: 1;
+    width: auto;
+  }
+}
+@media (max-width: 767px) {
+  .hive-app.hive-chat {
+    padding: 0;
+  }
+  .hive-chat-workspace {
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .hive-chat .hive-chat-sidebar {
+    width: min(17rem, calc(100vw - 48px));
+    padding: max(8px, env(safe-area-inset-top)) 6px env(safe-area-inset-bottom);
+    background: var(--chat-side);
+  }
+  .hive-chat .hive-chat-header {
+    min-height: 3.5rem;
+    padding: max(6px, env(safe-area-inset-top)) 8px 6px;
+    gap: 7px;
+  }
+  .hive-chat .hive-chat-header h1 {
+    font-size: 1rem;
+  }
+  .hive-chat .hive-chat-header > button {
+    padding: 10px;
+    min-width: 2.5rem;
+    min-height: 2.5rem;
+  }
+  .hive-chat .hive-timeline {
+    padding: 12px 12px 8px;
+  }
+  .hive-chat .hive-message-group {
+    padding-left: 2.5rem;
+    margin-bottom: 0.875rem;
+  }
+  .hive-chat .hive-message-meta > span:nth-child(2) {
+    font-size: 0.8125rem;
+  }
+  .hive-chat-date {
+    font-size: 0.625rem;
+    margin-bottom: 12px;
+    gap: 9px;
+  }
+  .hive-chat .hive-message .message-markdown {
+    font-size: 0.9375rem;
+  }
+  .hive-chat .hive-composer {
+    padding: 8px 12px max(12px, env(safe-area-inset-bottom));
+  }
+  .hive-chat .hive-composer-field {
+    padding: 5px;
+    gap: 4px;
+  }
+  .hive-chat .hive-composer-field > button {
+    padding: 8px;
+  }
+  .hive-chat-body:has(> .hive-panel) > main {
+    visibility: hidden;
+  }
+  .hive-chat .hive-panel,
+  .hive-chat .hive-thread {
+    width: 100%;
+    height: 100dvh;
+  }
+  .hive-chat .hive-nav-link {
+    min-height: 2.5rem;
+  }
+  .hive-sidebar-account > button:last-child {
+    width: 40px;
+    height: 40px;
+  }
+  .hive-chat .hive-sidebar-section > button {
+    min-height: 2.5rem;
+  }
+}
+
+.hive-chat .hive-empty p {
+  color: var(--chat-muted);
+}
+.hive-chat .hive-empty h3 {
+  color: var(--chat-text);
+}
+.hive-chat .hive-announcements-empty p {
+  max-width: 26rem;
+}
+
+.hive-community-page {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  overflow-y: auto;
+  background: var(--chat-bg);
+  color: var(--chat-text);
+}
+.hive-chat .hive-community-header {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--hive-border);
+}
+.hive-chat .hive-community-header > div {
+  flex: 1;
+  min-width: 0;
+}
+.hive-chat .hive-community-header p {
+  color: var(--chat-muted);
+  font-size: 0.75rem;
+  margin-top: 4px;
+}
+.hive-community-header .hive-mobile-trigger {
+  color: var(--chat-text);
+}
+
+/* All standard pages use the same content width and density. */
+.hive-community-page > :is(.hive-feed, .hive-community-settings) {
+  width: 100%;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 16px 16px 32px;
+}
+.hive-community-page button.bg-amber-500 {
+  background: #e8bb71;
+  color: #29241b;
+}
+@media (max-width: 767px) {
+  .hive-community-page > :is(.hive-feed, .hive-community-settings) {
+    padding: 12px 12px 24px;
+  }
+}
+
+/* One compact navigation hierarchy on every member route. */
+.hive-sidebar-scroll {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: 12px;
+}
+.hive-chat .hive-search-shortcut {
+  margin-left: auto;
+  font: inherit;
+  opacity: 0.75;
+}
+.hive-chat .hive-connection {
+  padding: 0 16px 6px;
+}
+.hive-chat .hive-nav-link {
+  width: 100%;
+  text-align: left;
+}
+.hive-chat .hive-nav-link > span:first-of-type {
+  min-width: 0;
+}
+.hive-chat .hive-announcements-link {
+  margin: 0;
+}
+.hive-chat .hive-studio {
+  padding: 4px 8px 8px;
+}
+.hive-chat .hive-studio > h2 {
+  margin: 6px 8px 5px;
+}
+.hive-chat .hive-section-heading {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 4px;
+  min-height: 28px;
+  list-style: none;
+  color: var(--chat-muted);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.035em;
+  text-transform: uppercase;
+}
+.hive-dm-section {
+  position: relative;
+}
+.hive-sidebar-section {
+  position: relative;
+  margin-bottom: 8px;
+}
+.hive-chat summary::-webkit-details-marker {
+  display: none;
+}
+.hive-sidebar-section:not([open]) > summary svg,
+.hive-member-streams:not([open]) > summary > svg:last-child {
+  transform: rotate(-90deg);
+}
+.hive-chat .hive-dm-section .hive-dm-heading {
+  position: absolute;
+  right: 3px;
+  top: 0;
+  padding: 0;
+}
+.hive-chat .hive-dm-heading > button {
+  min-height: 28px;
+  min-width: 28px;
+}
+.hive-chat .hive-browse-channels {
+  width: 100%;
+  text-align: left;
+  color: var(--chat-muted);
+}
+.hive-chat .hive-dm-empty {
+  padding: 4px 8px;
+}
+.hive-unread-dot,
+.hive-live-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--chat-muted);
+}
+.hive-live-dot {
+  background: #8fc5a6;
+}
+.hive-chat .hive-room-count {
+  margin-left: auto;
+  color: var(--chat-muted);
+  font-size: 0.6875rem;
+}
+.hive-member-streams > summary {
+  list-style: none;
+}
+.hive-chat .hive-member-streams > summary > svg:last-child {
+  margin-left: auto;
+}
+.hive-chat .hive-member-streams > button {
+  padding-left: 22px;
+}
+.hive-chat .hive-room-note {
+  padding: 5px 8px 5px 27px;
+  font-size: 0.6875rem;
+  color: var(--chat-muted);
+}
+.hive-chat .hive-personal-agents {
+  width: auto;
+  margin: 4px 8px;
+  flex-shrink: 0;
+}
+.hive-channel-pin {
+  margin-left: auto;
+  color: var(--chat-muted);
+}
+.hive-dialog .hive-channel-browser > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.hive-dialog .hive-channel-browser input {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid var(--hive-border);
+  margin: 12px 0 8px;
+}
+.hive-dialog .hive-channel-browser p {
+  font-size: 0.75rem;
+  color: var(--color-neutral-400);
+  margin: 8px 0;
+}
+.hive-dialog .hive-channel-browser > div > button {
+  min-height: 36px;
+  padding: 6px 8px;
+  border-radius: 4px;
+}
+.hive-dialog .hive-channel-browser > div > button:first-child {
+  flex: 1;
+  text-align: left;
+}
+.hive-dialog .hive-channel-browser button:hover {
+  background: var(--color-neutral-800);
+}
+.hive-dialog .hive-channel-browser button[aria-pressed="true"] {
+  color: var(--color-amber-400);
+}
+@media (max-width: 767px) {
+  .hive-chat .hive-section-heading,
+  .hive-chat .hive-dm-heading > button {
+    min-height: 2.5rem;
+  }
+  .hive-dialog .hive-channel-browser > div > button {
+    min-height: 2.75rem;
+  }
+}
+
+.hive-chat .hive-sidebar-section {
+  padding: 0;
+  border: 0;
+}
+.hive-chat .hive-sidebar-section > summary {
+  border: 0;
+  margin: 0;
+}
+.hive-chat .hive-member-streams {
+  padding: 0;
+  border: 0;
+}
+.hive-chat .hive-member-streams > summary {
+  border: 0;
+  margin: 0;
+}
+
+@media (min-width: 1400px) {
+  .hive-chat .hive-chat-sidebar {
+    width: 16rem;
+  }
+}

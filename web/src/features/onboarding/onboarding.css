@@ -1,0 +1,293 @@
+.hive-onboarding {
+  min-height: 100dvh;
+  padding: 0 48px 48px;
+}
+.hive-onboarding > header {
+  max-width: 1120px;
+  margin: auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+}
+.hive-onboarding .hive-brand {
+  padding: 32px 0;
+}
+.hive-onboarding-skip {
+  color: #aeb4b9;
+  font-size: 0.8125rem;
+  padding: 10px 0;
+}
+.hive-onboarding-layout {
+  max-width: 1040px;
+  margin: 60px auto 0;
+  display: grid;
+  grid-template-columns: 0.9fr 1.1fr;
+  gap: 90px;
+  align-items: start;
+}
+.hive-onboarding-eyebrow {
+  color: #edb95c;
+  font-size: 0.625rem;
+  letter-spacing: 0.14em;
+  font-weight: 600;
+  margin-bottom: 18px;
+}
+.hive-onboarding h1 {
+  font-size: 2.85rem;
+  font-weight: 550;
+  line-height: 1.13;
+  margin-bottom: 25px;
+  color: #f3f1ec;
+}
+.hive-onboarding h1 > :where(span) {
+  color: #edb95c;
+}
+.hive-onboarding aside > p:not(.hive-onboarding-eyebrow) {
+  color: #aeb4b9;
+  line-height: 1.8;
+  max-width: 325px;
+}
+.hive-onboarding-progress {
+  display: grid;
+  gap: 30px;
+  margin: 45px 0;
+  padding: 0;
+  list-style: none;
+}
+.hive-onboarding-progress li {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  color: #899096;
+}
+.hive-onboarding-progress li:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  height: 25px;
+  width: 1px;
+  top: 35px;
+  left: 16px;
+  background: #363b3d;
+}
+.hive-onboarding-progress li > span:first-child {
+  border: 1px solid #41464a;
+  width: 33px;
+  height: 33px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  font-size: 0.625rem;
+}
+.hive-onboarding-progress li[aria-current] {
+  color: #f2c773;
+}
+.hive-onboarding-progress li[aria-current] > span:first-child {
+  border-color: #edb95c;
+}
+.hive-onboarding-progress li[data-complete="true"] {
+  color: #d7d9d5;
+}
+.hive-onboarding-aside-note {
+  font-size: 0.75rem;
+}
+.hive-onboarding-content {
+  border-top: 2px solid #edb95c;
+  padding-top: 28px;
+  min-width: 0;
+}
+.hive-onboarding h2 {
+  font-size: 1.8rem;
+  line-height: 1.25;
+  color: #f3f1ec;
+  font-weight: 550;
+  margin: 0 0 20px;
+}
+.hive-onboarding h2:focus {
+  outline: none;
+}
+.hive-onboarding-content
+  > p:not(.hive-onboarding-eyebrow, .hive-onboarding-error) {
+  color: #aeb4b9;
+  line-height: 1.75;
+}
+.hive-onboarding-art {
+  width: 100%;
+  color: #edb95c;
+  margin: 24px 0;
+}
+.hive-onboarding-cell {
+  fill: #141516;
+  stroke: #646050;
+  stroke-width: 1;
+}
+.hive-onboarding-cell.is-center {
+  stroke: #edb95c;
+  fill: #29251d;
+}
+.hive-onboarding-welcome {
+  display: grid;
+  gap: 22px;
+}
+.hive-onboarding-welcome p {
+  color: #aeb4b9;
+  line-height: 1.7;
+}
+.hive-onboarding-welcome strong {
+  color: #e0e3e5;
+  display: block;
+  font-weight: 550;
+  margin-bottom: 4px;
+}
+.hive-onboarding-content footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin-top: 36px;
+}
+.hive-onboarding-content footer > .hive-primary-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-left: auto;
+}
+.hive-onboarding-note {
+  font-size: 0.75rem;
+  color: #aeb4b9;
+}
+.hive-onboarding-profile-preview {
+  margin-top: 40px;
+  padding: 22px 0;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  border-top: 1px solid #2b2e30;
+  border-bottom: 1px solid #2b2e30;
+}
+.hive-onboarding-profile-preview > span {
+  border: 1px solid #675637;
+  background: #29251d;
+  color: #f2c773;
+  font-size: 1.4rem;
+  border-radius: 50%;
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+.hive-onboarding-profile-preview strong {
+  display: block;
+  overflow-wrap: anywhere;
+  font-weight: 550;
+}
+.hive-onboarding-profile-preview small {
+  display: block;
+  color: #899096;
+  font-size: 0.75rem;
+  margin-top: 4px;
+}
+.hive-onboarding-destinations {
+  margin: 24px 0;
+  border: 0;
+  padding: 0;
+  min-width: 0;
+}
+.hive-onboarding-destinations label {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  cursor: pointer;
+  padding: 24px 0;
+  border-bottom: 1px solid #363b3d;
+}
+.hive-onboarding-destinations label > svg {
+  color: #899096;
+  flex-shrink: 0;
+}
+.hive-onboarding-destinations label:has(input:checked) > svg {
+  color: #edb95c;
+}
+.hive-onboarding-destinations input {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+}
+.hive-onboarding-destinations strong {
+  display: block;
+  color: #e0e3e5;
+  font-weight: 550;
+}
+.hive-onboarding-destinations small {
+  display: block;
+  color: #aeb4b9;
+  font-size: 0.8125rem;
+  line-height: 1.65;
+  margin-top: 5px;
+}
+.hive-onboarding-error {
+  margin-top: 24px;
+  color: #fca5a5;
+}
+@media (min-width: 1600px) {
+  .hive-onboarding-layout {
+    margin-top: 100px;
+  }
+}
+@media (max-width: 950px) {
+  .hive-onboarding-layout {
+    gap: 40px;
+  }
+  .hive-onboarding h1 {
+    font-size: 2.3rem;
+  }
+}
+@media (max-width: 720px) {
+  .hive-onboarding {
+    padding: 0 24px 32px;
+  }
+  .hive-onboarding .hive-brand {
+    padding: 24px 0;
+  }
+  .hive-onboarding-layout {
+    display: block;
+    margin-top: 20px;
+  }
+  .hive-onboarding aside > h1,
+  .hive-onboarding aside > p {
+    display: none;
+  }
+  .hive-onboarding-progress {
+    display: flex;
+    gap: 16px;
+    justify-content: space-between;
+    margin: 0 0 30px;
+  }
+  .hive-onboarding-progress li {
+    gap: 8px;
+    font-size: 0.6875rem;
+  }
+  .hive-onboarding-progress li:not(:last-child)::after {
+    display: none;
+  }
+  .hive-onboarding-progress li > span:first-child {
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+  }
+  .hive-onboarding h2 {
+    font-size: 1.75rem;
+  }
+  .hive-onboarding-content {
+    padding-top: 24px;
+  }
+  .hive-onboarding-content footer {
+    gap: 16px;
+  }
+  .hive-onboarding-content footer > button {
+    font-size: 0.8125rem;
+  }
+}

@@ -250,6 +250,15 @@ impl ActionSink for RelayActionSink {
                 ));
             }
 
+            crate::handlers::ingest::check_channel_publishing(
+                &state,
+                tenant.community(),
+                channel_uuid,
+                &author_pubkey_bytes,
+            )
+            .await
+            .map_err(ActionSinkError::InvalidInput)?;
+
             // 3. Build kind:9 Nostr event
             //    - Signed by relay keypair (event.pubkey = relay pubkey)
             //    - `p` tag attributes the message to the workflow owner

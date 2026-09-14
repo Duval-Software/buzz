@@ -8,7 +8,10 @@ import { Route as rootRouteImport } from "./routes/root";
 import { Route as workflowsRouteImport } from "./routes/workflows";
 import { Route as reposRouteImport } from "./routes/repos";
 import { Route as pulseRouteImport } from "./routes/pulse";
+import { Route as onboardingRouteImport } from "./routes/onboarding";
+import { Route as liveRouteImport } from "./routes/live";
 import { Route as inboxRouteImport } from "./routes/inbox";
+import { Route as communityRouteImport } from "./routes/community";
 import { Route as chatRouteImport } from "./routes/chat";
 import { Route as agentsRouteImport } from "./routes/agents";
 import { Route as indexRouteImport } from "./routes/index";
@@ -31,9 +34,24 @@ const pulseRoute = pulseRouteImport.update({
   path: "/pulse",
   getParentRoute: () => rootRouteImport,
 } as any);
+const onboardingRoute = onboardingRouteImport.update({
+  id: "/onboarding",
+  path: "/onboarding",
+  getParentRoute: () => rootRouteImport,
+} as any);
+const liveRoute = liveRouteImport.update({
+  id: "/live",
+  path: "/live",
+  getParentRoute: () => rootRouteImport,
+} as any);
 const inboxRoute = inboxRouteImport.update({
   id: "/inbox",
   path: "/inbox",
+  getParentRoute: () => rootRouteImport,
+} as any);
+const communityRoute = communityRouteImport.update({
+  id: "/community",
+  path: "/community",
   getParentRoute: () => rootRouteImport,
 } as any);
 const chatRoute = chatRouteImport.update({
@@ -72,7 +90,10 @@ export interface FileRoutesByFullPath {
   "/": typeof indexRoute;
   "/agents": typeof agentsRoute;
   "/chat": typeof chatRoute;
+  "/community": typeof communityRoute;
   "/inbox": typeof inboxRoute;
+  "/live": typeof liveRoute;
+  "/onboarding": typeof onboardingRoute;
   "/pulse": typeof pulseRoute;
   "/repos": typeof reposRoute;
   "/workflows": typeof workflowsRoute;
@@ -84,7 +105,10 @@ export interface FileRoutesByTo {
   "/": typeof indexRoute;
   "/agents": typeof agentsRoute;
   "/chat": typeof chatRoute;
+  "/community": typeof communityRoute;
   "/inbox": typeof inboxRoute;
+  "/live": typeof liveRoute;
+  "/onboarding": typeof onboardingRoute;
   "/pulse": typeof pulseRoute;
   "/repos": typeof reposRoute;
   "/workflows": typeof workflowsRoute;
@@ -97,7 +121,10 @@ export interface FileRoutesById {
   "/": typeof indexRoute;
   "/agents": typeof agentsRoute;
   "/chat": typeof chatRoute;
+  "/community": typeof communityRoute;
   "/inbox": typeof inboxRoute;
+  "/live": typeof liveRoute;
+  "/onboarding": typeof onboardingRoute;
   "/pulse": typeof pulseRoute;
   "/repos": typeof reposRoute;
   "/workflows": typeof workflowsRoute;
@@ -111,7 +138,10 @@ export interface FileRouteTypes {
     | "/"
     | "/agents"
     | "/chat"
+    | "/community"
     | "/inbox"
+    | "/live"
+    | "/onboarding"
     | "/pulse"
     | "/repos"
     | "/workflows"
@@ -123,7 +153,10 @@ export interface FileRouteTypes {
     | "/"
     | "/agents"
     | "/chat"
+    | "/community"
     | "/inbox"
+    | "/live"
+    | "/onboarding"
     | "/pulse"
     | "/repos"
     | "/workflows"
@@ -135,7 +168,10 @@ export interface FileRouteTypes {
     | "/"
     | "/agents"
     | "/chat"
+    | "/community"
     | "/inbox"
+    | "/live"
+    | "/onboarding"
     | "/pulse"
     | "/repos"
     | "/workflows"
@@ -148,7 +184,10 @@ export interface RootRouteChildren {
   indexRoute: typeof indexRoute;
   agentsRoute: typeof agentsRoute;
   chatRoute: typeof chatRoute;
+  communityRoute: typeof communityRoute;
   inboxRoute: typeof inboxRoute;
+  liveRoute: typeof liveRoute;
+  onboardingRoute: typeof onboardingRoute;
   pulseRoute: typeof pulseRoute;
   reposRoute: typeof reposRoute;
   workflowsRoute: typeof workflowsRoute;
@@ -180,11 +219,32 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof pulseRouteImport;
       parentRoute: typeof rootRouteImport;
     };
+    "/onboarding": {
+      id: "/onboarding";
+      path: "/onboarding";
+      fullPath: "/onboarding";
+      preLoaderRoute: typeof onboardingRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/live": {
+      id: "/live";
+      path: "/live";
+      fullPath: "/live";
+      preLoaderRoute: typeof liveRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     "/inbox": {
       id: "/inbox";
       path: "/inbox";
       fullPath: "/inbox";
       preLoaderRoute: typeof inboxRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/community": {
+      id: "/community";
+      path: "/community";
+      fullPath: "/community";
+      preLoaderRoute: typeof communityRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     "/chat": {
@@ -236,7 +296,10 @@ const rootRouteChildren: RootRouteChildren = {
   indexRoute: indexRoute,
   agentsRoute: agentsRoute,
   chatRoute: chatRoute,
+  communityRoute: communityRoute,
   inboxRoute: inboxRoute,
+  liveRoute: liveRoute,
+  onboardingRoute: onboardingRoute,
   pulseRoute: pulseRoute,
   reposRoute: reposRoute,
   workflowsRoute: workflowsRoute,

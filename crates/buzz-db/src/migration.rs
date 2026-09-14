@@ -561,7 +561,14 @@ mod tests {
         let mut migrations: Vec<_> = MIGRATOR.iter().collect();
         migrations.sort_by_key(|migration| migration.version);
 
-        assert_eq!(migrations.len(), 28);
+        assert_eq!(migrations.len(), 30);
+        assert_eq!(migrations[29].version, 30);
+        assert_eq!(migrations[28].version, 29);
+        assert!(migrations[28]
+            .sql
+            .as_str()
+            .contains("ADD COLUMN posting_policy"));
+        assert!(!migrations[0].sql.as_str().contains("posting_policy"));
         assert_eq!(migrations[0].version, 1);
         assert_eq!(&*migrations[0].description, "initial schema");
         assert!(migrations[0]
@@ -1310,5 +1317,50 @@ mod tests {
             search_expression.contains("ELSE NULL::tsvector"),
             "fresh installs must default non-allowlisted kinds to NULL: {search_expression}"
         );
+    }
+    #[tokio::test]
+    #[ignore = "requires isolated Postgres; resets public schema"]
+    async fn posting_policy_migration_preserves_existing_channels() {
+        let pool = connect_test_pool().await;
+        reset_public_schema(&pool).await;
+        MIGRATOR.run_to(28, &pool).await.expect("legacy schema");
+        let community = uuid::Uuid::new_v4();
+        let channel = uuid::Uuid::new_v4();
+        sqlx::query("INSERT INTO communities (id, host) VALUES ($1, $2)")
+            .bind(community)
+            .bind(format!("policy-migration-{community}.example"))
+            .execute(&pool)
+            .await
+            .expect("community");
+        sqlx::query("INSERT INTO channels (id, community_id, name, created_by, visibility) VALUES ($1, $2, 'legacy', $3, 'private')")
+            .bind(channel).bind(community).bind(vec![1u8; 32])
+            .execute(&pool).await.expect("legacy channel");
+        sqlx::query("INSERT INTO relay_members (community_id,pubkey,role) VALUES ($1,$2,'owner')")
+            .bind(community)
+            .bind("ab".repeat(32))
+            .execute(&pool)
+            .await
+            .expect("legacy owner");
+        run_migrations(&pool).await.expect("upgrade");
+        let owner: String =
+            sqlx::query_scalar("SELECT role FROM relay_members WHERE community_id=$1")
+                .bind(community)
+                .fetch_one(&pool)
+                .await
+                .expect("owner preserved");
+        assert_eq!(owner, "owner");
+        let accounts: i64 =
+            sqlx::query_scalar("SELECT count(*) FROM community_accounts WHERE community_id=$1")
+                .bind(community)
+                .fetch_one(&pool)
+                .await
+                .expect("account schema exists");
+        assert_eq!(
+            accounts, 0,
+            "migration must not invent credentials for existing members"
+        );
+        let row: (String, String) = sqlx::query_as("SELECT posting_policy, visibility::text FROM channels WHERE community_id = $1 AND id = $2")
+            .bind(community).bind(channel).fetch_one(&pool).await.expect("upgraded channel");
+        assert_eq!(row, ("all".into(), "private".into()));
     }
 }

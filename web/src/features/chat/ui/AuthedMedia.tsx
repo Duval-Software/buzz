@@ -19,17 +19,32 @@ export function AuthedImage({
   className?: string;
   style?: React.CSSProperties;
 }) {
-  const src = useAuthedMediaUrl(url);
+  const { src, failed, onError } = useAuthedMediaUrl(url);
+  if (failed)
+    return (
+      <p className="hive-media-error" role="status">
+        Attachment unavailable. Try reopening this conversation.
+      </p>
+    );
   if (!src) {
     return (
       <div
         className={className}
         style={{ ...style, minHeight: "6rem" }}
-        aria-label="loading attachment"
+        role="status"
+        aria-label="Loading attachment"
       />
     );
   }
-  return <img src={src} alt={alt} className={className} style={style} />;
+  return (
+    <img
+      onError={onError}
+      src={src}
+      alt={alt}
+      className={className}
+      style={style}
+    />
+  );
 }
 
 export function AuthedVideo({
@@ -41,19 +56,27 @@ export function AuthedVideo({
   className?: string;
   style?: React.CSSProperties;
 }) {
-  const src = useAuthedMediaUrl(url);
+  const { src, failed, onError } = useAuthedMediaUrl(url);
+  if (failed)
+    return (
+      <p className="hive-media-error" role="status">
+        Attachment unavailable. Try reopening this conversation.
+      </p>
+    );
   if (!src) {
     return (
       <div
         className={className}
         style={{ ...style, minHeight: "6rem" }}
-        aria-label="loading video"
+        role="status"
+        aria-label="Loading video"
       />
     );
   }
-  // biome-ignore lint/a11y/useMediaCaption: user uploads carry no caption track
   return (
+    // biome-ignore lint/a11y/useMediaCaption: user uploads carry no caption track
     <video
+      onError={onError}
       src={src}
       controls
       preload="metadata"
@@ -70,10 +93,24 @@ export function AuthedAudio({
   url: string;
   className?: string;
 }) {
-  const src = useAuthedMediaUrl(url);
+  const { src, failed, onError } = useAuthedMediaUrl(url);
+  if (failed)
+    return (
+      <p className="hive-media-error" role="status">
+        Attachment unavailable. Try reopening this conversation.
+      </p>
+    );
   if (!src) {
     return <p className={className}>loading…</p>;
   }
-  // biome-ignore lint/a11y/useMediaCaption: recorded speech carries no caption track
-  return <audio src={src} controls preload="metadata" className={className} />;
+  return (
+    // biome-ignore lint/a11y/useMediaCaption: recorded speech carries no caption track
+    <audio
+      onError={onError}
+      src={src}
+      controls
+      preload="metadata"
+      className={className}
+    />
+  );
 }

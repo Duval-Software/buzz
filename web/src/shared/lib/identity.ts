@@ -1,25 +1,5 @@
-/**
- * A durable browser identity.
- *
- * `nostr-signer` already offers two paths: a NIP-07 extension, or a generated
- * key that lives only for the page. Neither fits a community member who wants
- * to close the tab and come back as the same person without installing
- * anything, so this adds a third: a key generated once and kept in
- * localStorage.
- *
- * The secret never leaves the device and is never sent anywhere. It is stored
- * as an `nsec` so a human can recognise, back up, and move it.
- *
- * Security note, stated plainly: a key in localStorage is weaker than one held
- * by an extension. Clearing site data loses it, and script injection on this
- * origin could read it. That is the right trade for "let me into the community"
- * and the wrong one for holding funds. NIP-07 still wins when present.
- *
- * This module is also the single source of truth for WHO is signed in, with
- * subscribers, because more than one component needs to react to that. Holding
- * it in component state instead means a sign-out in one place leaves every
- * other place still believing in the old identity.
- */
+/** Identity used by the messaging protocol. Credential accounts unlock it in memory.
+ * Legacy browser identities remain available until their owner creates a login. */
 
 import { nip19 } from "nostr-tools";
 import { generateSecretKey, getPublicKey } from "nostr-tools/pure";
@@ -30,6 +10,8 @@ export type StoredIdentity = {
   secretKey: Uint8Array;
   pubkey: string;
   npub: string;
+  username?: string;
+  sessionToken?: string;
 };
 
 /**
@@ -139,6 +121,19 @@ export function exportIdentity(): string | null {
   return typeof localStorage === "undefined"
     ? null
     : localStorage.getItem(STORAGE_KEY);
+}
+
+/** Unlock a credential account without persisting its secret or password. */
+export function unlockAccount(
+  secretKey: Uint8Array,
+  username: string,
+  sessionToken: string,
+): StoredIdentity {
+  const identity = { ...toIdentity(secretKey), username, sessionToken };
+  // Remove a migrated legacy secret only after the server has saved the account.
+  localStorage.removeItem(STORAGE_KEY);
+  publish(identity);
+  return identity;
 }
 
 export function forgetIdentity(): void {

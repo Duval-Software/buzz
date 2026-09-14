@@ -500,6 +500,7 @@ pub async fn validate_admin_event(
                 "purpose",
                 "visibility",
                 "ttl",
+                "posting_policy",
             ];
             let has_recognized = event
                 .tags
@@ -509,6 +510,33 @@ pub async fn validate_admin_event(
                 return Err(anyhow::anyhow!(
                     "kind:9002 must include at least one metadata tag (name, about, archived, topic, purpose, visibility, ttl)"
                 ));
+            }
+
+            let policies: Vec<_> = event
+                .tags
+                .iter()
+                .filter(|t| t.kind().to_string() == "posting_policy")
+                .collect();
+            if policies.len() > 1
+                || policies
+                    .iter()
+                    .any(|t| !matches!(t.content(), Some("all" | "admins")))
+            {
+                return Err(anyhow::anyhow!(
+                    "posting_policy must be one tag with all or admins"
+                ));
+            }
+            // Publishing settings and announcement headers require an actual channel role.
+            // Agent ownership and community administration do not grant channel publishing rights.
+            if !policies.is_empty() || channel.posting_policy == "admins" {
+                let members = state.db.get_members(tenant.community(), channel_id).await?;
+                if !members.iter().any(|m| {
+                    m.pubkey == actor_bytes && matches!(m.role.as_str(), "owner" | "admin")
+                }) {
+                    return Err(anyhow::anyhow!(
+                        "only channel owners/admins may change announcement settings"
+                    ));
+                }
             }
 
             // Validate archived values before storage.
@@ -590,7 +618,12 @@ pub async fn validate_admin_event(
             // topic/purpose allow any member.
             let has_privileged_tag = event.tags.iter().any(|t| {
                 let k = t.kind().to_string();
-                k == "name" || k == "about" || k == "archived" || k == "visibility" || k == "ttl"
+                k == "name"
+                    || k == "about"
+                    || k == "archived"
+                    || k == "visibility"
+                    || k == "ttl"
+                    || k == "posting_policy"
             });
             if has_privileged_tag {
                 let members = state.db.get_members(tenant.community(), channel_id).await?;
@@ -1056,6 +1089,7 @@ pub async fn emit_group_discovery_events(
     {
         let mut tags: Vec<Tag> = vec![Tag::parse(["d", &group_id])?];
         tags.push(Tag::parse(["name", &channel.name])?);
+        tags.push(Tag::parse(["posting_policy", &channel.posting_policy])?);
         if let Some(ref desc) = channel.description {
             if !desc.is_empty() {
                 tags.push(Tag::parse(["about", desc])?);
@@ -1442,6 +1476,20 @@ async fn handle_edit_metadata(
         let key = tag.kind().to_string();
         if let Some(val) = tag.content() {
             match key.as_str() {
+                "posting_policy" => {
+                    state
+                        .db
+                        .update_channel(
+                            tenant.community(),
+                            channel_id,
+                            buzz_db::channel::ChannelUpdate {
+                                posting_policy: Some(val.to_string()),
+                                ..Default::default()
+                            },
+                        )
+                        .await?;
+                }
+
                 "name" => {
                     state
                         .db

@@ -897,6 +897,79 @@ pub(crate) fn effective_message_author(event: &Event, relay_pubkey: &nostr::Publ
     event.pubkey.to_bytes().to_vec()
 }
 
+// Metadata side effects elsewhere are best-effort. Never acknowledge this safety
+// setting as applied unless the authoritative row actually contains it, including retries.
+async fn confirm_posting_policy(
+    state: &AppState,
+    community: CommunityId,
+    event: &Event,
+) -> Result<(), IngestError> {
+    if event_kind_u32(event) != KIND_NIP29_EDIT_METADATA {
+        return Ok(());
+    }
+    if let Some(policy) = event
+        .tags
+        .iter()
+        .find(|t| t.kind().to_string() == "posting_policy")
+        .and_then(|t| t.content())
+    {
+        let channel_id = extract_channel_id(event)
+            .ok_or_else(|| IngestError::Rejected("invalid: missing channel".into()))?;
+        let channel = state
+            .db
+            .get_channel(community, channel_id)
+            .await
+            .map_err(|e| {
+                IngestError::Internal(format!("error: confirming publishing policy: {e}"))
+            })?;
+        if channel.posting_policy != policy {
+            return Err(IngestError::Internal(
+                "error: publishing policy was not applied; refresh and retry".into(),
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn announcement_requires_publisher(kind: u32) -> bool {
+    !matches!(
+        kind,
+        KIND_REACTION | KIND_DELETION | 9000 | 9001 | 9002 | 9005 | 9007 | 9008 | 9021 | 9022
+    ) && !buzz_core::kind::is_moderation_command_kind(kind)
+}
+
+/// Enforce channel publishing for external events and workflow-attributed messages.
+/// Roles are read fresh from the tenant-scoped database; community roles confer no exemption.
+pub(crate) async fn check_channel_publishing(
+    state: &AppState,
+    community: CommunityId,
+    channel_id: Uuid,
+    author: &[u8],
+) -> Result<(), String> {
+    let channel = state
+        .db
+        .get_channel(community, channel_id)
+        .await
+        .map_err(|_| "restricted: channel publishing policy unavailable".to_string())?;
+    if channel.posting_policy == "all" {
+        return Ok(());
+    }
+    let members = state
+        .db
+        .get_members(community, channel_id)
+        .await
+        .map_err(|_| "restricted: channel publisher permissions unavailable".to_string())?;
+    if channel.posting_policy == "admins"
+        && members
+            .iter()
+            .any(|m| m.pubkey == author && matches!(m.role.as_str(), "owner" | "admin"))
+    {
+        Ok(())
+    } else {
+        Err("restricted: only channel owners/admins can publish announcements".into())
+    }
+}
+
 /// Validate kind:40003 edit ownership — event.pubkey must match target's effective author,
 /// or the actor must be the owning human of the agent that authored the target message.
 async fn validate_edit_ownership(
@@ -1931,7 +2004,13 @@ async fn ingest_event_inner(
     let kind_u32 = event_kind_u32(&event);
     debug!(event_id = %event_id_hex, kind = kind_u32, "ingest_event");
 
-    if kind_u32 == KIND_AUTH {
+    if kind_u32 == KIND_AUTH
+        || event.tags.iter().any(|tag| {
+            tag.as_slice()
+                .first()
+                .is_some_and(|name| name == "account-session")
+        })
+    {
         return Err(IngestError::Rejected(
             "invalid: AUTH events cannot be submitted".into(),
         ));
@@ -2424,6 +2503,17 @@ async fn ingest_event_inner(
         crate::handlers::side_effects::validate_standard_deletion_event(tenant, &event, state)
             .await
             .map_err(|e| IngestError::Rejected(format!("invalid: {e}")))?;
+    }
+
+    // All external transports converge here, before storage/fan-out. Commands retain
+    // their own authorization; reactions remain available to readers. Unknown/new
+    // channel content kinds are restricted too, not just the current chat kind.
+    if let Some(ch_id) = channel_id {
+        if announcement_requires_publisher(kind_u32) {
+            check_channel_publishing(state, tenant.community(), ch_id, &pubkey_bytes)
+                .await
+                .map_err(IngestError::AuthFailed)?;
+        }
     }
 
     if channel_id.is_some() {
@@ -2935,6 +3025,7 @@ async fn ingest_event_inner(
     };
 
     if !was_inserted {
+        confirm_posting_policy(state, tenant.community(), &event).await?;
         return Ok(IngestResult {
             event_id: event_id_hex,
             accepted: true,
@@ -2955,6 +3046,8 @@ async fn ingest_event_inner(
             error!(event_id = %event_id_hex, kind = kind_u32, "Side effect failed: {e}");
         }
     }
+
+    confirm_posting_policy(state, tenant.community(), &event).await?;
 
     // A freshly inserted reply changed its thread's counters (updated in the
     // same transaction as the insert) — push a fresh relay-signed 39005 so

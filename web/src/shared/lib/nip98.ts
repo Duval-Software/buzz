@@ -3,6 +3,8 @@
  * HTTP requests to the relay (used by isomorphic-git for smart HTTP transport).
  */
 
+import { loadIdentity } from "./identity";
+import { finalizeEvent, getPublicKey } from "nostr-tools/pure";
 import { signNostrEvent } from "./nostr-signer";
 
 async function sha256Hex(value: string): Promise<string> {
@@ -23,7 +25,12 @@ async function sha256Hex(value: string): Promise<string> {
 export async function makeNip98AuthHeader(
   url: string,
   method: string,
-  options?: { body?: string; payloadSha256?: string; requireNip07?: boolean },
+  options?: {
+    body?: string;
+    payloadSha256?: string;
+    requireNip07?: boolean;
+    secretKey?: Uint8Array;
+  },
 ): Promise<string> {
   const tags = [
     ["u", url],
@@ -37,14 +44,22 @@ export async function makeNip98AuthHeader(
     tags.push(["payload", payload]);
     tags.push(["nonce", crypto.randomUUID()]);
   }
-  const event = await signNostrEvent(
-    {
-      kind: 27235,
-      tags,
-      content: "",
-    },
-    { requireNip07: options?.requireNip07 },
-  );
+  const unsigned = {
+    kind: 27235,
+    tags,
+    content: "",
+    created_at: Math.floor(Date.now() / 1000),
+  };
+  const account = loadIdentity();
+  if (
+    options?.secretKey &&
+    account?.sessionToken &&
+    account.pubkey === getPublicKey(options.secretKey)
+  )
+    unsigned.tags.push(["account-session", account.sessionToken]);
+  const event = options?.secretKey
+    ? finalizeEvent(unsigned, options.secretKey)
+    : await signNostrEvent(unsigned, { requireNip07: options?.requireNip07 });
 
   const json = JSON.stringify(event);
   const base64 = btoa(json);

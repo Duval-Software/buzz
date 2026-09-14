@@ -27,6 +27,8 @@ pub struct ChannelRecord {
     pub channel_type: String,
     /// Visibility string (`"open"` or `"private"`).
     pub visibility: String,
+    /// Publishing policy: `all` preserves normal posting; `admins` restricts to channel owners/admins.
+    pub posting_policy: String,
     /// Optional channel description.
     pub description: Option<String>,
     /// Optional canvas (rich document) content.
@@ -153,7 +155,7 @@ pub async fn create_channel(
                nip29_group_id, topic_required, max_members,
                topic, topic_set_by, topic_set_at,
                purpose, purpose_set_by, purpose_set_at,
-               ttl_seconds, ttl_deadline
+               ttl_seconds, ttl_deadline, posting_policy
         FROM channels WHERE community_id = $1 AND id = $2
         "#,
     )
@@ -253,7 +255,7 @@ pub async fn create_channel_with_id(
                nip29_group_id, topic_required, max_members,
                topic, topic_set_by, topic_set_at,
                purpose, purpose_set_by, purpose_set_at,
-               ttl_seconds, ttl_deadline
+               ttl_seconds, ttl_deadline, posting_policy
         FROM channels WHERE community_id = $1 AND id = $2
         "#,
     )
@@ -281,7 +283,7 @@ pub async fn get_channel(
                nip29_group_id, topic_required, max_members,
                topic, topic_set_by, topic_set_at,
                purpose, purpose_set_by, purpose_set_at,
-               ttl_seconds, ttl_deadline
+               ttl_seconds, ttl_deadline, posting_policy
         FROM channels WHERE community_id = $1 AND id = $2 AND deleted_at IS NULL
         "#,
     )
@@ -794,7 +796,7 @@ pub async fn list_channels(
                    nip29_group_id, topic_required, max_members,
                    topic, topic_set_by, topic_set_at,
                    purpose, purpose_set_by, purpose_set_at,
-                   ttl_seconds, ttl_deadline
+                   ttl_seconds, ttl_deadline, posting_policy
             FROM channels
             WHERE community_id = $1 AND deleted_at IS NULL AND visibility::text = $2
             ORDER BY created_at DESC
@@ -814,7 +816,7 @@ pub async fn list_channels(
                    nip29_group_id, topic_required, max_members,
                    topic, topic_set_by, topic_set_at,
                    purpose, purpose_set_by, purpose_set_at,
-                   ttl_seconds, ttl_deadline
+                   ttl_seconds, ttl_deadline, posting_policy
             FROM channels
             WHERE community_id = $1 AND deleted_at IS NULL
             ORDER BY created_at DESC
@@ -862,7 +864,7 @@ async fn get_channel_tx(
                nip29_group_id, topic_required, max_members,
                topic, topic_set_by, topic_set_at,
                purpose, purpose_set_by, purpose_set_at,
-               ttl_seconds, ttl_deadline
+               ttl_seconds, ttl_deadline, posting_policy
         FROM channels WHERE community_id = $1 AND id = $2 AND deleted_at IS NULL
         "#,
     )
@@ -964,7 +966,7 @@ pub async fn get_accessible_channels(
                c.nip29_group_id, c.topic_required, c.max_members,
                c.topic, c.topic_set_by, c.topic_set_at,
                c.purpose, c.purpose_set_by, c.purpose_set_at,
-               c.ttl_seconds, c.ttl_deadline,
+               c.ttl_seconds, c.ttl_deadline, c.posting_policy,
                (cm.channel_id IS NOT NULL) AS is_member
         FROM channels c
         LEFT JOIN channel_members cm
@@ -1107,6 +1109,7 @@ fn row_to_channel_record(row: sqlx::postgres::PgRow) -> Result<ChannelRecord> {
         name: row.try_get("name")?,
         channel_type: row.try_get("channel_type")?,
         visibility: row.try_get("visibility")?,
+        posting_policy: row.try_get("posting_policy")?,
         description: row.try_get("description")?,
         canvas: row.try_get("canvas")?,
         created_by: row.try_get("created_by")?,
@@ -1151,6 +1154,8 @@ pub struct ChannelUpdate {
     pub description: Option<String>,
     /// New visibility (`"open"`/`"private"`), or `None` to leave unchanged.
     pub visibility: Option<String>,
+    /// New publishing policy (`all`/`admins`), or `None` to leave unchanged.
+    pub posting_policy: Option<String>,
     /// TTL change: outer `None` leaves it unchanged, `Some(None)` clears the
     /// ephemeral TTL (channel becomes permanent), `Some(Some(secs))` sets it.
     /// On any change the `ttl_deadline` is reset to `NOW() + ttl_seconds`.
@@ -1171,6 +1176,7 @@ pub async fn update_channel(
         && updates.description.is_none()
         && updates.visibility.is_none()
         && updates.ttl_seconds.is_none()
+        && updates.posting_policy.is_none()
     {
         return Err(DbError::InvalidData(
             "at least one field must be provided for update".to_string(),
@@ -1200,6 +1206,10 @@ pub async fn update_channel(
         set_parts.push(format!("visibility = ${param_idx}::channel_visibility"));
         param_idx += 1;
     }
+    if updates.posting_policy.is_some() {
+        set_parts.push(format!("posting_policy = ${param_idx}"));
+        param_idx += 1;
+    }
     if let Some(ref ttl) = updates.ttl_seconds {
         // Set ttl_seconds, then reset the deadline from now (or clear both).
         set_parts.push(format!("ttl_seconds = ${param_idx}"));
@@ -1227,6 +1237,9 @@ pub async fn update_channel(
     }
     if let Some(ref vis) = updates.visibility {
         q = q.bind(vis);
+    }
+    if let Some(ref policy) = updates.posting_policy {
+        q = q.bind(policy);
     }
     if let Some(ref ttl) = updates.ttl_seconds {
         q = q.bind(*ttl);

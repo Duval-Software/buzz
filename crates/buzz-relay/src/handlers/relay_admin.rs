@@ -896,4 +896,289 @@ mod tests {
             Some("https://example.com/closed.png")
         );
     }
+    /// Real signed HTTP/WS ingestion, with an isolated Postgres community.
+    #[tokio::test]
+    #[ignore = "requires Postgres"]
+    async fn announcement_publishing_enforces_roles_and_alternative_paths() {
+        use crate::handlers::ingest::{
+            check_channel_publishing, ingest_event, HttpAuthMethod, IngestAuth,
+        };
+        use buzz_auth::Scope;
+        use buzz_db::channel::{ChannelType, ChannelUpdate, ChannelVisibility, MemberRole};
+        let host = format!("announcements-{}.example", uuid::Uuid::new_v4());
+        let (state, tenant) = workspace_profile_test_state(&host, false).await;
+        let owner = Keys::generate();
+        let owner_key = owner.public_key().to_bytes();
+        let channel = state
+            .db
+            .create_channel(
+                tenant.community(),
+                "announcements",
+                ChannelType::Stream,
+                ChannelVisibility::Open,
+                None,
+                &owner_key,
+                None,
+            )
+            .await
+            .expect("create channel");
+        assert_eq!(
+            channel.posting_policy, "all",
+            "migration defaults preserve existing channels"
+        );
+        let member = Keys::generate();
+        let member_key = member.public_key().to_bytes();
+        state
+            .db
+            .add_member(
+                tenant.community(),
+                channel.id,
+                &member_key,
+                MemberRole::Member,
+                Some(&owner_key),
+            )
+            .await
+            .expect("member");
+        let event = |keys: &Keys, kind: u16, extra: Vec<Tag>| {
+            let mut tags = vec![
+                Tag::parse(["h", &channel.id.to_string()]).expect("h"),
+                Tag::parse(["nonce", &uuid::Uuid::new_v4().to_string()]).expect("nonce"),
+            ];
+            tags.extend(extra);
+            EventBuilder::new(Kind::Custom(kind), "Local policy test")
+                .tags(tags)
+                .sign_with_keys(keys)
+                .expect("sign")
+        };
+        let http = |keys: &Keys| IngestAuth::Http {
+            pubkey: keys.public_key(),
+            scopes: Scope::all_known(),
+            auth_method: HttpAuthMethod::Nip98,
+        };
+        let original = event(&member, 9, vec![]);
+        let result = ingest_event(&state, &tenant, original.clone(), http(&member))
+            .await
+            .expect("normal member post");
+        assert!(result.accepted);
+
+        for bad in ["bogus", ""] {
+            let invalid = event(
+                &owner,
+                9002,
+                vec![Tag::parse(["posting_policy", bad]).expect("policy")],
+            );
+            assert!(ingest_event(&state, &tenant, invalid, http(&owner))
+                .await
+                .is_err());
+        }
+        let duplicate = event(
+            &owner,
+            9002,
+            vec![
+                Tag::parse(["posting_policy", "admins"]).expect("policy"),
+                Tag::parse(["posting_policy", "all"]).expect("policy"),
+            ],
+        );
+        assert!(ingest_event(&state, &tenant, duplicate, http(&owner))
+            .await
+            .is_err());
+        let unauthorized = event(
+            &member,
+            9002,
+            vec![Tag::parse(["posting_policy", "admins"]).expect("policy")],
+        );
+        assert!(ingest_event(&state, &tenant, unauthorized, http(&member))
+            .await
+            .is_err());
+        assert_eq!(
+            state
+                .db
+                .get_channel(tenant.community(), channel.id)
+                .await
+                .expect("channel")
+                .posting_policy,
+            "all"
+        );
+        let settings = event(
+            &owner,
+            9002,
+            vec![Tag::parse(["posting_policy", "admins"]).expect("policy")],
+        );
+        assert!(
+            ingest_event(&state, &tenant, settings.clone(), http(&owner))
+                .await
+                .expect("owner policy")
+                .accepted
+        );
+        assert_eq!(
+            state
+                .db
+                .get_channel(tenant.community(), channel.id)
+                .await
+                .expect("channel")
+                .posting_policy,
+            "admins"
+        );
+
+        for role in [MemberRole::Member, MemberRole::Guest, MemberRole::Bot] {
+            let reader = Keys::generate();
+            let key = reader.public_key().to_bytes();
+            state
+                .db
+                .add_member(tenant.community(), channel.id, &key, role, Some(&owner_key))
+                .await
+                .expect("reader");
+            assert!(
+                check_channel_publishing(&state, tenant.community(), channel.id, &key)
+                    .await
+                    .is_err(),
+                "workflow owner must also be a publisher"
+            );
+            for kind in [9, 40002, 40003, 45001, 45003] {
+                let denied = event(
+                    &reader,
+                    kind,
+                    vec![Tag::parse(["e", &original.id.to_hex()]).expect("target")],
+                );
+                let id = denied.id.to_bytes();
+                let auth = IngestAuth::Nip42 {
+                    pubkey: reader.public_key(),
+                    scopes: Scope::all_known(),
+                    channel_ids: None,
+                    conn_id: uuid::Uuid::new_v4(),
+                };
+                let error = ingest_event(&state, &tenant, denied, auth)
+                    .await
+                    .err()
+                    .expect("reader denied");
+                assert!(
+                    format!("{error:?}").contains("only channel owners/admins"),
+                    "{kind}: {error:?}"
+                );
+                assert!(state
+                    .db
+                    .get_event_by_id(tenant.community(), &id)
+                    .await
+                    .expect("lookup")
+                    .is_none());
+            }
+        }
+        let edit = event(
+            &member,
+            40003,
+            vec![Tag::parse(["e", &original.id.to_hex()]).expect("target")],
+        );
+        assert!(
+            ingest_event(&state, &tenant, edit, http(&member))
+                .await
+                .is_err(),
+            "author cannot edit old content after conversion"
+        );
+        let no_h_edit = EventBuilder::new(Kind::Custom(40003), "bypass")
+            .tags([Tag::parse(["e", &original.id.to_hex()]).expect("target")])
+            .sign_with_keys(&member)
+            .expect("sign");
+        assert!(ingest_event(&state, &tenant, no_h_edit, http(&member))
+            .await
+            .is_err());
+        let outsider = Keys::generate();
+        assert!(
+            ingest_event(
+                &state,
+                &tenant,
+                event(&outsider, 9, vec![]),
+                http(&outsider)
+            )
+            .await
+            .is_err(),
+            "open visibility is not publisher authority"
+        );
+        let admin = Keys::generate();
+        let admin_key = admin.public_key().to_bytes();
+        state
+            .db
+            .add_member(
+                tenant.community(),
+                channel.id,
+                &admin_key,
+                MemberRole::Admin,
+                Some(&owner_key),
+            )
+            .await
+            .expect("admin");
+        for keys in [&owner, &admin] {
+            assert!(
+                ingest_event(&state, &tenant, event(keys, 9, vec![]), http(keys))
+                    .await
+                    .expect("publisher post")
+                    .accepted
+            );
+        }
+        state
+            .db
+            .remove_member(tenant.community(), channel.id, &admin_key, &owner_key)
+            .await
+            .expect("remove admin");
+        assert!(
+            check_channel_publishing(&state, tenant.community(), channel.id, &admin_key)
+                .await
+                .is_err(),
+            "removed roles must not remain cached"
+        );
+        let reaction = EventBuilder::new(Kind::Custom(7), "+")
+            .tags([Tag::parse(["e", &original.id.to_hex()]).expect("target")])
+            .sign_with_keys(&member)
+            .expect("sign");
+        assert!(
+            ingest_event(&state, &tenant, reaction, http(&member))
+                .await
+                .expect("reader reaction")
+                .accepted
+        );
+        let topic = event(
+            &member,
+            9002,
+            vec![Tag::parse(["topic", "not allowed"]).expect("topic")],
+        );
+        assert!(ingest_event(&state, &tenant, topic, http(&member))
+            .await
+            .is_err());
+        // Database constraint rejects malformed values even from non-event callers.
+        assert!(state
+            .db
+            .update_channel(
+                tenant.community(),
+                channel.id,
+                ChannelUpdate {
+                    posting_policy: Some("unknown".into()),
+                    ..Default::default()
+                }
+            )
+            .await
+            .is_err());
+        state
+            .db
+            .update_channel(
+                tenant.community(),
+                channel.id,
+                ChannelUpdate {
+                    posting_policy: Some("all".into()),
+                    ..Default::default()
+                },
+            )
+            .await
+            .expect("restore normal");
+        assert!(
+            ingest_event(&state, &tenant, settings, http(&owner))
+                .await
+                .is_err(),
+            "a duplicate must not claim an unapplied policy succeeded"
+        );
+        assert!(
+            ingest_event(&state, &tenant, event(&member, 9, vec![]), http(&member))
+                .await
+                .expect("restored normal post")
+                .accepted
+        );
+    }
 }

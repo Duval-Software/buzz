@@ -7,7 +7,8 @@ export const Route = createFileRoute("/chat")({
   // ?room= opens a live video room (go-live announcements).
   validateSearch: (
     search: Record<string, unknown>,
-  ): { channel?: string; room?: string } => ({
+  ): { channel?: string; room?: string; view?: "announcements" } => ({
+    view: search.view === "announcements" ? "announcements" : undefined,
     channel: typeof search.channel === "string" ? search.channel : undefined,
     room: typeof search.room === "string" ? search.room : undefined,
   }),

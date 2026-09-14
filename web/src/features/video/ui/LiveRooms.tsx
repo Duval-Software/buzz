@@ -1,21 +1,9 @@
+import { ChevronDown, Sofa, Video } from "lucide-react";
 import { loungeRoom, ownRoom } from "@/features/video/stage-client";
 import { useLiveRooms } from "@/features/video/use-live-rooms";
+import { useNames } from "@/features/profile/use-profiles";
 
-/**
- * Going live, and seeing who else is.
- *
- * The Lounge sits first and is ALWAYS visible, even empty. It is the one room
- * that works like a Discord voice channel: nobody hosts it, you just walk in —
- * and a drop-in room that only appears once somebody is already inside defeats
- * the reason it exists, because nobody is ever willing to be first.
- *
- * Your own room needs a way in even when it is empty too — a list of live
- * rooms alone leaves no way to become one, which is how raising a hand ends up
- * with nowhere to raise it.
- *
- * Per-channel calls are reached from inside their channel; showing them twice
- * would be two doors into one room.
- */
+/** Member rooms share the Studio group; publishing controls stay inside its disclosure. */
 export function LiveRooms({
   selfPubkey,
   activeRoom,
@@ -25,86 +13,79 @@ export function LiveRooms({
   activeRoom: string | null;
   onOpen: (room: string) => void;
 }) {
-  const { rooms } = useLiveRooms(true);
+  const { rooms, loading, error } = useLiveRooms(true);
+  const names = useNames();
   const mine = ownRoom(selfPubkey);
   const lounge = loungeRoom();
-  const others = rooms.filter(
-    (room) => room.name !== mine && room.name !== lounge,
-  );
-  const myRoom = rooms.find((room) => room.name === mine);
+  const memberRooms = rooms.filter((room) => room.name !== lounge);
   const loungeNow = rooms.find((room) => room.name === lounge);
-
   return (
-    <div className="border-neutral-800 border-t px-2 py-2">
-      {lounge ? (
+    <>
+      {lounge && (
         <button
           type="button"
+          className="hive-nav-link"
+          aria-current={activeRoom === lounge ? "page" : undefined}
           onClick={() => onOpen(lounge)}
-          className={
-            activeRoom === lounge
-              ? "w-full rounded bg-neutral-800 px-2 py-2 text-left text-neutral-50 text-sm md:py-1.5"
-              : "w-full rounded px-2 py-2 text-left text-neutral-300 text-sm hover:bg-neutral-900 md:py-1.5"
-          }
         >
-          <span className="flex items-center justify-between gap-2">
-            <span className="truncate">🛋️ The Lounge</span>
-            <span className="shrink-0 text-neutral-500 text-xs">
-              {loungeNow ? loungeNow.participants : "empty"}
-            </span>
-          </span>
+          <Sofa size={17} aria-hidden="true" />
+          <span>The Lounge</span>
+          {!error && loungeNow && (
+            <span className="hive-room-count">{loungeNow.participants}</span>
+          )}
         </button>
-      ) : null}
-      <button
-        type="button"
-        onClick={() => onOpen(mine)}
-        className={
-          activeRoom === mine
-            ? "mt-1 w-full rounded bg-neutral-800 px-2 py-2 text-left text-neutral-50 text-sm md:py-1.5"
-            : "mt-1 w-full rounded px-2 py-2 text-left text-neutral-300 text-sm hover:bg-neutral-900 md:py-1.5"
-        }
-      >
-        <span className="flex items-center justify-between gap-2">
-          <span className="truncate">
-            <span className="text-red-500">●</span>{" "}
-            {myRoom ? "Your room is live" : "Go live"}
-          </span>
-          {myRoom ? (
-            <span className="shrink-0 text-neutral-500 text-xs">
-              {myRoom.participants}
-            </span>
-          ) : null}
-        </span>
-      </button>
-
-      {others.length > 0 ? (
-        <>
-          <span className="mt-2 block px-2 text-neutral-500 text-xs">
-            Live now
-          </span>
-          {others.map((room) => (
+      )}
+      <details className="hive-member-streams">
+        <summary className="hive-nav-link">
+          <Video size={17} aria-hidden="true" />
+          <span>Member streams</span>
+          {!error && memberRooms.length > 0 && (
+            <span
+              className="hive-live-dot"
+              aria-label="Members live"
+              role="img"
+            />
+          )}
+          <ChevronDown size={12} aria-hidden="true" />
+        </summary>
+        {error ? (
+          <p className="hive-room-note">Room status unavailable</p>
+        ) : loading ? (
+          <p className="hive-room-note">Checking rooms…</p>
+        ) : memberRooms.length === 0 ? (
+          <p className="hive-room-note">No members live right now.</p>
+        ) : (
+          memberRooms.map((room) => (
             <button
               key={room.name}
               type="button"
+              className="hive-nav-link"
+              aria-current={activeRoom === room.name ? "page" : undefined}
               onClick={() => onOpen(room.name)}
-              className={
-                room.name === activeRoom
-                  ? "mt-1 w-full rounded bg-neutral-800 px-2 py-2 text-left text-neutral-50 text-sm md:py-1.5"
-                  : "mt-1 w-full rounded px-2 py-2 text-left text-neutral-400 text-sm hover:bg-neutral-900 md:py-1.5"
-              }
             >
-              <span className="flex items-center justify-between gap-2">
-                <span className="truncate">
-                  <span className="text-red-500">●</span>{" "}
-                  {room.name.replace(/^stage-/, "")}
-                </span>
-                <span className="shrink-0 text-neutral-500 text-xs">
-                  {room.participants}
-                </span>
+              <span className="hive-live-dot" aria-hidden="true" />
+              <span className="truncate">
+                {room.name === mine
+                  ? "Your stream"
+                  : names(room.name.replace(/^stage-/, ""))}
               </span>
+              <span className="hive-room-count">{room.participants}</span>
             </button>
-          ))}
-        </>
-      ) : null}
-    </div>
+          ))
+        )}
+        <button
+          type="button"
+          className="hive-nav-link"
+          onClick={() => onOpen(mine)}
+        >
+          <Video size={15} aria-hidden="true" />
+          <span>
+            {rooms.some((room) => room.name === mine)
+              ? "Open your studio"
+              : "Go live"}
+          </span>
+        </button>
+      </details>
+    </>
   );
 }

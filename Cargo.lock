@@ -1183,6 +1183,7 @@ name = "buzz-relay"
 version = "0.2.1"
 dependencies = [
  "anyhow",
+ "argon2",
  "async-compression",
  "async-trait",
  "axum",

@@ -1,3 +1,5 @@
+import { MessageSquare } from "lucide-react";
+import { CommunityDialog } from "@/features/surfaces/ui/CommunityDialog";
 import { useState, useSyncExternalStore } from "react";
 import { openDm } from "@/features/dm/open-dm";
 import { AvatarDisc } from "@/features/profile/ui/AvatarDisc";
@@ -55,18 +57,14 @@ export function NewDmPicker({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/70 p-4 pt-[10vh]">
-      <div className="flex max-h-[70dvh] w-full max-w-md flex-col rounded-2xl border border-neutral-800 bg-neutral-950 text-neutral-200">
-        <div className="flex items-center justify-between border-neutral-800 border-b p-3">
-          <h2 className="font-semibold text-sm">New message</h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg border border-neutral-700 px-2.5 py-1.5 text-neutral-400 text-sm"
-          >
-            Close
-          </button>
-        </div>
+    <CommunityDialog
+      label="New message"
+      description="Choose someone to start a conversation."
+      icon={MessageSquare}
+      busy={busy !== null}
+      onClose={onClose}
+    >
+      <div className="flex flex-col">
         {error ? (
           <p className="px-3 pt-2 text-red-400 text-sm" role="alert">
             {error}
@@ -103,6 +101,6 @@ export function NewDmPicker({
           )}
         </div>
       </div>
-    </div>
+    </CommunityDialog>
   );
 }

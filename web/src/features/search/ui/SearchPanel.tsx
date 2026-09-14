@@ -1,3 +1,5 @@
+import { Search } from "lucide-react";
+import { CommunityDialog } from "@/features/surfaces/ui/CommunityDialog";
 import { useEffect, useRef, useState } from "react";
 import { contentWithoutMediaLines } from "@/features/chat/message-media";
 import type { Channel } from "@/features/chat/use-chat";
@@ -89,14 +91,18 @@ export function SearchPanel({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/70 p-4 pt-[10vh]">
-      <div className="flex max-h-[70dvh] w-full max-w-xl flex-col rounded-2xl border border-neutral-800 bg-neutral-950 text-neutral-200">
-        <form
-          onSubmit={run}
-          className="flex items-center gap-2 border-neutral-800 border-b p-3"
-        >
+    <CommunityDialog
+      label="Search the hive"
+      description="Find messages across your community."
+      icon={Search}
+      onClose={onClose}
+    >
+      <div className="flex flex-col">
+        <form onSubmit={run} className="flex items-center gap-2">
           <input
             ref={inputRef}
+            data-dialog-autofocus
+            aria-label="Search messages"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search the hive"
@@ -108,13 +114,6 @@ export function SearchPanel({
             className="shrink-0 rounded-lg bg-amber-500 px-3 py-2 font-semibold text-neutral-950 text-sm disabled:opacity-40"
           >
             {busy ? "…" : "Search"}
-          </button>
-          <button
-            type="button"
-            onClick={onClose}
-            className="shrink-0 rounded-lg border border-neutral-700 px-2.5 py-2 text-neutral-400 text-sm"
-          >
-            Close
           </button>
         </form>
 
@@ -157,6 +156,6 @@ export function SearchPanel({
           )}
         </div>
       </div>
-    </div>
+    </CommunityDialog>
   );
 }

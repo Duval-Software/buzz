@@ -3,6 +3,10 @@ import type { ChatMessage } from "@/features/chat/use-chat";
 import { PresenceDot } from "@/features/chat/ui/PresenceDot";
 import type { PresenceStatus } from "@/features/chat/use-presence";
 import type { Thread } from "@/features/chat/use-threads";
+import {
+  MessageContent,
+  MessageAttachments,
+} from "@/features/chat/ui/MessageContent";
 import { useNames } from "@/features/profile/use-profiles";
 
 function timeOf(unix: number): string {
@@ -24,12 +28,16 @@ function timeOf(unix: number): string {
  * timeline — a 375px screen split two ways is two unusable columns.
  */
 export function ThreadPanel({
+  canPublish = true,
   thread,
+  selfPubkey,
   statusOf,
   onClose,
   onSend,
 }: {
+  canPublish?: boolean;
   thread: Thread;
+  selfPubkey: string;
   statusOf: (pubkey: string) => PresenceStatus;
   onClose: () => void;
   onSend: (text: string, target: ChatMessage) => Promise<void>;
@@ -46,7 +54,11 @@ export function ThreadPanel({
     // that arrive while it is open — animating the initial position just looks
     // like the panel is still loading.
     bottomRef.current?.scrollIntoView({
-      behavior: lastReplyId ? "smooth" : "auto",
+      behavior:
+        lastReplyId &&
+        !window.matchMedia("(prefers-reduced-motion: reduce)").matches
+          ? "smooth"
+          : "auto",
     });
   }, [lastReplyId]);
 
@@ -74,14 +86,14 @@ export function ThreadPanel({
   }
 
   return (
-    <aside className="flex w-full shrink-0 flex-col border-neutral-800 bg-neutral-950 max-md:fixed max-md:inset-0 max-md:z-40 md:w-96 md:border-l">
+    <aside className="hive-panel hive-thread flex w-full shrink-0 flex-col border-neutral-800 bg-neutral-950 max-md:fixed max-md:inset-0 max-md:z-40 md:border-l">
       <header className="flex items-center justify-between gap-2 border-neutral-800 border-b px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
         <div className="min-w-0">
           <h2 className="font-semibold text-sm">Thread</h2>
           <p className="text-neutral-500 text-xs">
             {thread.replies.length === 0
               ? "No replies yet"
-              : `${thread.replies.length} ${thread.replies.length === 1 ? "reply" : "replies"} · ${thread.participants.length} ${thread.participants.length === 1 ? "person" : "people"}`}
+              : `${thread.replies.length} ${thread.replies.length === 1 ? "reply" : "replies"} · ${thread.participants.length} ${thread.participants.length === 1 ? "participant" : "participants"}`}
           </p>
         </div>
         <button
@@ -104,9 +116,8 @@ export function ThreadPanel({
               {timeOf(thread.root.createdAt)}
             </time>
           </div>
-          <p className="whitespace-pre-wrap break-words text-base leading-relaxed">
-            {thread.root.content}
-          </p>
+          <MessageContent message={thread.root} selfPubkey={selfPubkey} />
+          <MessageAttachments message={thread.root} />
         </article>
 
         {thread.replies.map((reply) => (
@@ -120,41 +131,49 @@ export function ThreadPanel({
                 {timeOf(reply.createdAt)}
               </time>
             </div>
-            <p
+            <div
               className={
                 reply.pending
-                  ? "whitespace-pre-wrap break-words text-base text-neutral-500 leading-relaxed"
-                  : "whitespace-pre-wrap break-words text-base leading-relaxed"
+                  ? "min-w-0 break-words text-base text-neutral-500 leading-relaxed"
+                  : "min-w-0 break-words text-base leading-relaxed"
               }
             >
-              {reply.content}
-            </p>
+              <MessageContent message={reply} selfPubkey={selfPubkey} />
+            </div>
+            <MessageAttachments message={reply} />
           </article>
         ))}
         <div ref={bottomRef} />
       </div>
 
-      <form
-        onSubmit={submit}
-        className="border-neutral-800 border-t p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
-      >
-        {error ? <p className="mb-2 text-red-400 text-sm">{error}</p> : null}
-        <div className="flex items-center gap-2">
-          <input
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            placeholder="Reply in thread"
-            className="min-w-0 flex-1 rounded-lg border border-neutral-800 bg-neutral-900 px-3 py-2 text-base outline-none placeholder:text-neutral-600 focus:border-neutral-600"
-          />
-          <button
-            type="submit"
-            disabled={draft.trim().length === 0 || sending}
-            className="shrink-0 rounded-lg bg-amber-500 px-3 py-2 font-semibold text-neutral-950 text-sm disabled:opacity-40"
-          >
-            Reply
-          </button>
-        </div>
-      </form>
+      {canPublish ? (
+        <form
+          onSubmit={submit}
+          className="border-neutral-800 border-t p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+        >
+          {error ? <p className="mb-2 text-red-400 text-sm">{error}</p> : null}
+          <div className="flex items-center gap-2">
+            <input
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              aria-label="Reply in thread"
+              placeholder="Reply in thread"
+              className="min-w-0 flex-1 rounded-lg border border-neutral-800 bg-neutral-900 px-3 py-2 text-base outline-none placeholder:text-neutral-600 focus:border-neutral-600"
+            />
+            <button
+              type="submit"
+              disabled={draft.trim().length === 0 || sending}
+              className="shrink-0 rounded-lg bg-amber-500 px-3 py-2 font-semibold text-neutral-950 text-sm disabled:opacity-40"
+            >
+              Reply
+            </button>
+          </div>
+        </form>
+      ) : (
+        <p className="hive-announcement-note">
+          Only channel owners and admins can reply to announcements.
+        </p>
+      )}
     </aside>
   );
 }

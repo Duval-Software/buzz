@@ -1,16 +1,24 @@
 import { createHash } from "node:crypto";
 import { expect, test } from "@playwright/test";
+import { installCommunityFixture } from "../helpers/community";
 
-test("home page loads with Buzz branding", async ({ page }) => {
+test("home page opens community login for visitors", async ({ page }) => {
+  await installCommunityFixture(page, undefined, { noIdentity: true });
   await page.goto("/");
+  await expect(page).toHaveURL("/chat");
   await expect(
-    page.getByRole("main").getByRole("img", { name: "Buzz" }),
+    page.getByRole("heading", { name: "Welcome back to the Hive" }),
   ).toBeVisible();
+  await expect(page.getByLabel("Username", { exact: true })).toBeVisible();
 });
 
-test("home page shows repositories section", async ({ page }) => {
+test("home page opens the community for existing members", async ({ page }) => {
+  await installCommunityFixture(page);
   await page.goto("/");
-  await expect(page.getByText("Repositories")).toBeVisible();
+  await expect(page).toHaveURL("/chat");
+  await expect(
+    page.getByRole("button", { name: /Your profile/ }),
+  ).toBeVisible();
 });
 
 test("invite requires age and legal consent before opening Buzz", async ({
@@ -120,34 +128,8 @@ test("invite requires age and legal consent before opening Buzz", async ({
   expect(consentBox?.width).toBe(acceptButtonBox?.width);
 });
 
-test("invite can enroll a NIP-07 identity for browser access", async ({
-  page,
-}) => {
-  const pubkey = "ab".repeat(32);
-  await page.addInitScript((extensionPubkey) => {
-    (
-      window as Window & {
-        nostr?: {
-          getPublicKey(): Promise<string>;
-          signEvent(
-            event: Record<string, unknown>,
-          ): Promise<Record<string, unknown>>;
-        };
-      }
-    ).nostr = {
-      async getPublicKey() {
-        return extensionPubkey;
-      },
-      async signEvent(event) {
-        return {
-          ...event,
-          id: "cd".repeat(32),
-          pubkey: extensionPubkey,
-          sig: "ef".repeat(64),
-        };
-      },
-    };
-  }, pubkey);
+test("invite can enroll an existing browser profile", async ({ page }) => {
+  const { self: pubkey } = await installCommunityFixture(page);
   await page.route("**/api/join-policy", async (route) => {
     await route.fulfill({
       status: 200,
@@ -197,7 +179,7 @@ test("invite can enroll a NIP-07 identity for browser access", async ({
 
   await page.goto("/invite/browser-code");
   await page.getByRole("button", { name: "Join in browser" }).click();
-  await expect(page).toHaveURL("/");
+  await expect(page).toHaveURL("/chat");
   expect(claimObserved).toBe(true);
 });
 

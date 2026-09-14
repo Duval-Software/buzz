@@ -1,3 +1,4 @@
+import { Inbox, AtSign } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { contentWithoutMediaLines } from "@/features/chat/message-media";
@@ -37,13 +38,13 @@ function MentionRow({
       type="button"
       onClick={() => onOpen(item)}
       className={cn(
-        "flex w-full items-start gap-3 border-neutral-800 border-b px-4 py-3 text-left hover:bg-neutral-900",
+        "hive-list-row flex w-full items-start gap-3 border-neutral-800 border-b px-4 py-3 text-left hover:bg-neutral-900",
         item.unread && "bg-amber-500/5",
       )}
     >
       <AvatarDisc pubkey={item.pubkey} name={names(item.pubkey)} size={30} />
       <span className="min-w-0 flex-1">
-        <span className="flex items-center gap-2">
+        <span className="hive-inbox-meta flex items-center gap-2">
           <b className="text-sm">{names(item.pubkey)}</b>
           <span className="text-neutral-600 text-xs">{source}</span>
           <time className="ml-auto shrink-0 text-neutral-500 text-xs">
@@ -75,7 +76,7 @@ function ApprovalRow({
   onAnswer: (item: ApprovalItem, grant: boolean) => void;
 }) {
   return (
-    <div className="border-neutral-800 border-b px-4 py-3">
+    <div className="hive-list-row border-neutral-800 border-b px-4 py-3">
       <div className="flex items-center gap-2">
         <AvatarDisc pubkey={item.pubkey} name={names(item.pubkey)} size={26} />
         <b className="text-sm">{names(item.pubkey)}</b>
@@ -158,7 +159,6 @@ export function InboxPage() {
   return (
     <SurfaceShell
       title="Inbox"
-      subtitle="Mentions, replies, and things waiting on you"
       action={
         <button
           type="button"
@@ -170,7 +170,7 @@ export function InboxPage() {
         </button>
       }
     >
-      <div className="mx-auto max-w-2xl">
+      <div className="hive-feed">
         {error ? (
           <p className="px-4 pt-3 text-red-400 text-sm" role="alert">
             {error}
@@ -193,25 +193,36 @@ export function InboxPage() {
           </section>
         ) : null}
 
-        <h2 className="px-4 pt-4 pb-1 font-semibold text-neutral-500 text-xs uppercase tracking-wide">
-          Mentions &amp; messages
-        </h2>
-        {loading && items.length === 0 ? (
-          <p className="px-4 py-6 text-neutral-500 text-sm">checking…</p>
-        ) : items.length === 0 ? (
-          <p className="px-4 py-6 text-neutral-500 text-sm">
-            Nothing addressed to you yet. Mentions and DM messages land here.
-          </p>
-        ) : (
-          items.map((item) => (
-            <MentionRow
-              key={item.id}
-              item={item}
-              names={names}
-              onOpen={openItem}
-            />
-          ))
-        )}
+        <section aria-label="Mentions and messages">
+          <div className="hive-section-heading">
+            <AtSign size={19} aria-hidden="true" />
+            <div>
+              <h2>Mentions &amp; messages</h2>
+              <p>Your conversations, gathered in one place.</p>
+            </div>
+          </div>
+          {loading && items.length === 0 ? (
+            <p className="px-4 py-6 text-neutral-500 text-sm">checking…</p>
+          ) : items.length === 0 ? (
+            <div className="hive-empty">
+              <Inbox aria-hidden="true" />
+              <h3>A little breathing room.</h3>
+              <p>
+                When someone mentions you or sends a direct message, you’ll find
+                it here.
+              </p>
+            </div>
+          ) : (
+            items.map((item) => (
+              <MentionRow
+                key={item.id}
+                item={item}
+                names={names}
+                onOpen={openItem}
+              />
+            ))
+          )}
+        </section>
       </div>
     </SurfaceShell>
   );

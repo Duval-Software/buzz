@@ -1,18 +1,7 @@
-/**
- * Who this browser is, and whether the community lets them in.
- *
- * Two questions that look like one and are not:
- *
- *   - Is there a key on this device?           (localStorage)
- *   - Does the relay accept it?                (NIP-42 verdict)
- *
- * Keeping them apart is what lets the front door say something true. Someone
- * with no key needs a join button; someone with a key the relay refuses needs
- * to know their key is fine and their MEMBERSHIP is what is missing. Collapsing
- * both into "signed out" would send the second person off to make a second key
- * they do not need.
- */
+/** Account sign-in and community admission are separate server decisions. */
 
+import { logoutAccount } from "@/features/identity/accounts";
+import { resetProfiles } from "@/features/profile/profile-store";
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import {
   createIdentity,
@@ -45,7 +34,7 @@ export function useMembership(): {
   /** Adopt an existing key. Returns false if the nsec is not valid. */
   adoptIdentity: (nsec: string) => boolean;
   /** Forget the key on this device and drop the connection. */
-  signOut: () => void;
+  signOut: () => Promise<void>;
   /** Re-authenticate — call after joining so the relay re-decides. */
   recheck: () => void;
 } {
@@ -77,6 +66,18 @@ export function useMembership(): {
     return unsubscribe;
   }, [identity]);
 
+  useEffect(() => {
+    if (
+      identity?.username &&
+      auth.state === "denied" &&
+      auth.reason.includes("Session expired")
+    ) {
+      getSocket(relayWsUrl()).close();
+      resetProfiles();
+      forgetIdentity();
+    }
+  }, [identity, auth]);
+
   const ensureIdentity = useCallback((): StoredIdentity => {
     return loadIdentity() ?? createIdentity();
   }, []);
@@ -90,10 +91,12 @@ export function useMembership(): {
     return true;
   }, []);
 
-  const signOut = useCallback((): void => {
+  const signOut = useCallback(async (): Promise<void> => {
+    await logoutAccount();
+    getSocket(relayWsUrl()).close();
+    resetProfiles();
     forgetIdentity();
     setAuth({ state: "unknown", reason: "" });
-    getSocket(relayWsUrl()).close();
   }, []);
 
   const recheck = useCallback((): void => {

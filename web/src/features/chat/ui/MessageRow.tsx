@@ -5,81 +5,15 @@ import {
   contentWithoutMediaLines,
   mediaLinesOf,
 } from "@/features/chat/message-media";
-import { formatVoiceNoteDuration } from "@/features/chat/voice-note";
 import {
-  AuthedAudio,
-  AuthedImage,
-  AuthedVideo,
-} from "@/features/chat/ui/AuthedMedia";
-import { segmentContent } from "@/features/chat/rich-text";
+  MessageContent,
+  MessageAttachments,
+} from "@/features/chat/ui/MessageContent";
 import { useNames } from "@/features/profile/use-profiles";
 import { cn } from "@/shared/lib/cn";
 
 /** The quick-reaction set. Anything else can still arrive from other clients. */
 const QUICK_EMOJI = ["👍", "🎉", "👀", "🐝"];
-
-/**
- * The message body with mentions and custom emoji rendered inline.
- *
- * Mention names resolve through the event's `p` tags: the tag names WHO is
- * notified, the profile store names what they are called, and the text is
- * highlighted wherever that name follows an `@`. Nothing is trusted from the
- * text alone — an "@Name" with no matching `p` tag stays plain text.
- */
-function RichContent({
-  message,
-  selfPubkey,
-}: {
-  message: ChatMessage;
-  selfPubkey: string;
-}) {
-  const names = useNames();
-  const mentionNames = new Map<string, string>();
-  for (const pubkey of message.mentions) {
-    mentionNames.set(names(pubkey), pubkey);
-  }
-  const segments = segmentContent(
-    contentWithoutMediaLines(message.content),
-    mentionNames,
-    message.emoji,
-  );
-  return (
-    <>
-      {segments.map((segment, index) => {
-        // Segments have no ids; the list is rebuilt whole on every change.
-        const key = `${index}-${segment.kind}`;
-        if (segment.kind === "mention") {
-          const isSelf = segment.pubkey === selfPubkey.toLowerCase();
-          return (
-            <span
-              key={key}
-              className={cn(
-                "rounded px-0.5 font-medium",
-                isSelf
-                  ? "bg-amber-500/25 text-amber-200"
-                  : "bg-amber-500/10 text-amber-400",
-              )}
-            >
-              {segment.text}
-            </span>
-          );
-        }
-        if (segment.kind === "emoji") {
-          return (
-            <img
-              key={key}
-              src={segment.url}
-              alt={`:${segment.code}:`}
-              title={`:${segment.code}:`}
-              className="inline-block h-5 w-5 align-text-bottom"
-            />
-          );
-        }
-        return <span key={key}>{segment.text}</span>;
-      })}
-    </>
-  );
-}
 
 export function MessageRow({
   message,
@@ -107,6 +41,8 @@ export function MessageRow({
   onDelete?: (message: ChatMessage) => Promise<void>;
 }) {
   const names = useNames();
+  // Animate a local send once, without replaying when its relay receipt arrives.
+  const [outgoing] = useState(() => Boolean(message.pending));
   const [editing, setEditing] = useState(false);
   const [editDraft, setEditDraft] = useState("");
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -157,7 +93,8 @@ export function MessageRow({
   return (
     <div
       className={cn(
-        "group relative",
+        "hive-message group relative",
+        outgoing && !message.failed && "is-outgoing",
         mentionsMe && "-mx-2 rounded-md bg-amber-500/5 px-2",
       )}
     >
@@ -175,6 +112,7 @@ export function MessageRow({
       {editing ? (
         <div className="my-1">
           <textarea
+            aria-label="Edit message"
             value={editDraft}
             onChange={(e) => setEditDraft(e.target.value)}
             rows={Math.min(8, Math.max(2, editDraft.split("\n").length))}
@@ -200,12 +138,12 @@ export function MessageRow({
       ) : (
         <div
           className={cn(
-            "whitespace-pre-wrap break-words text-base leading-relaxed",
+            "min-w-0 break-words text-base leading-relaxed",
             message.pending && "text-neutral-500",
             message.failed && "text-red-400",
           )}
         >
-          <RichContent message={message} selfPubkey={selfPubkey} />
+          <MessageContent message={message} selfPubkey={selfPubkey} />
           {message.editedAt ? (
             <span className="ml-1.5 text-neutral-600 text-xs">(edited)</span>
           ) : null}
@@ -223,60 +161,7 @@ export function MessageRow({
         </p>
       ) : null}
 
-      {(message.media ?? []).length > 0 ? (
-        <div className="mt-1.5 flex flex-col gap-1.5">
-          {(message.media ?? []).map((item) =>
-            item.kind === "voice" ? (
-              <div
-                key={item.url}
-                className="flex max-w-md items-center gap-2.5 rounded-lg border border-neutral-800 bg-neutral-900/60 px-3 py-2"
-              >
-                <span aria-hidden="true" className="shrink-0 text-lg">
-                  🎙️
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-neutral-400 text-xs">
-                    Voice note
-                    {item.duration
-                      ? ` · ${formatVoiceNoteDuration(item.duration)}`
-                      : ""}
-                  </p>
-                  <AuthedAudio url={item.url} className="mt-1 h-9 w-full" />
-                </div>
-              </div>
-            ) : item.kind === "video" ? (
-              <AuthedVideo
-                key={item.url}
-                url={item.url}
-                className="max-h-80 max-w-md rounded-lg border border-neutral-800 bg-black"
-                style={item.ratio ? { aspectRatio: item.ratio } : undefined}
-              />
-            ) : (
-              <a
-                key={item.url}
-                href={item.url}
-                target="_blank"
-                rel="noreferrer"
-                className="block max-w-md"
-              >
-                {/*
-                  Eager on purpose. A lazy image with no intrinsic size
-                  collapses to zero height, and Chromium never fetches a
-                  zero-sized lazy image — the attachment simply never appears
-                  (found live, not in review). Timelines are capped at 200
-                  messages and media is relay-local, so eager is cheap.
-                */}
-                <AuthedImage
-                  url={item.url}
-                  alt="attachment"
-                  className="w-full max-w-md rounded-lg border border-neutral-800 bg-neutral-900 object-contain"
-                  style={item.ratio ? { aspectRatio: item.ratio } : undefined}
-                />
-              </a>
-            ),
-          )}
-        </div>
-      ) : null}
+      <MessageAttachments message={message} />
 
       {replyCount > 0 && onOpenThread ? (
         <button
@@ -310,12 +195,13 @@ export function MessageRow({
 
       {/* Hover actions. Kept out of the flow so the timeline does not jump. */}
       {editing ? null : (
-        <div className="absolute top-0 right-0 hidden gap-1 rounded-md border border-neutral-800 bg-neutral-900 p-0.5 group-hover:flex">
+        <div className="hive-message-actions">
           {QUICK_EMOJI.map((emoji) => (
             <button
               key={emoji}
               type="button"
               title={`React ${emoji}`}
+              aria-label={`React ${emoji}`}
               onClick={() => onReact(message.id, emoji)}
               className="rounded px-1 text-sm hover:bg-neutral-800"
             >

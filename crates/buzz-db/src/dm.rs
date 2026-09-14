@@ -72,7 +72,7 @@ pub async fn find_dm_by_participants(
         SELECT id, name, channel_type::text AS channel_type, visibility::text AS visibility,
                description, canvas,
                created_by, created_at, updated_at, archived_at, deleted_at,
-               nip29_group_id, topic_required, max_members,
+               nip29_group_id, topic_required, max_members, posting_policy,
                topic, topic_set_by, topic_set_at,
                purpose, purpose_set_by, purpose_set_at
         FROM channels
@@ -133,7 +133,7 @@ pub async fn create_dm(
         SELECT id, name, channel_type::text AS channel_type, visibility::text AS visibility,
                description, canvas,
                created_by, created_at, updated_at, archived_at, deleted_at,
-               nip29_group_id, topic_required, max_members,
+               nip29_group_id, topic_required, max_members, posting_policy,
                topic, topic_set_by, topic_set_at,
                purpose, purpose_set_by, purpose_set_at
         FROM channels
@@ -203,7 +203,7 @@ pub async fn create_dm(
         SELECT id, name, channel_type::text AS channel_type, visibility::text AS visibility,
                description, canvas,
                created_by, created_at, updated_at, archived_at, deleted_at,
-               nip29_group_id, topic_required, max_members,
+               nip29_group_id, topic_required, max_members, posting_policy,
                topic, topic_set_by, topic_set_at,
                purpose, purpose_set_by, purpose_set_at
         FROM channels WHERE community_id = $1 AND id = $2
@@ -493,6 +493,7 @@ fn row_to_channel_record(row: sqlx::postgres::PgRow) -> Result<ChannelRecord> {
         name: row.try_get("name")?,
         channel_type: row.try_get("channel_type")?,
         visibility: row.try_get("visibility")?,
+        posting_policy: row.try_get("posting_policy")?,
         description: row.try_get("description")?,
         canvas: row.try_get("canvas")?,
         created_by: row.try_get("created_by")?,

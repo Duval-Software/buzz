@@ -1,4 +1,9 @@
-import type { ReactNode } from "react";
+import { Navigate, useLocation } from "@tanstack/react-router";
+import { needsOnboarding } from "@/features/onboarding/onboarding-state";
+import { type ReactNode, useState } from "react";
+import { loginAccount, registerAccount } from "@/features/identity/accounts";
+import { publishDisplayName } from "@/features/profile/profile-store";
+import { loadIdentity } from "@/shared/lib/identity";
 import { joinCommunity } from "@/features/identity/join";
 import { Welcome } from "@/features/identity/ui/Welcome";
 import { useMembership } from "@/features/identity/use-identity";
@@ -23,7 +28,9 @@ function sleep(ms: number): Promise<void> {
  * asked to press Join twice, which would burn a second invite code.
  */
 export function CommunityGate({ children }: { children: ReactNode }) {
-  const { status, reason, ensureIdentity, adoptIdentity } = useMembership();
+  const { status, identity, ensureIdentity, signOut } = useMembership();
+  const pathname = useLocation({ select: (location) => location.pathname });
+  const [pending, setPending] = useState(false);
 
   async function handleJoin(): Promise<void> {
     // The claim is signed by this key, so it has to exist first.
@@ -37,6 +44,9 @@ export function CommunityGate({ children }: { children: ReactNode }) {
       socket.reconnect();
       const verdict = await socket.waitForAuth(6_000);
       if (verdict.state === "accepted") {
+        const account = loadIdentity();
+        if (account?.username)
+          await publishDisplayName(account.pubkey, account.username);
         return;
       }
       await sleep(REAUTH_GAP_MS);
@@ -46,24 +56,42 @@ export function CommunityGate({ children }: { children: ReactNode }) {
     );
   }
 
-  if (status === "member") {
+  if (status === "member" && !pending) {
+    if (
+      identity &&
+      needsOnboarding(identity.pubkey) &&
+      pathname !== "/onboarding"
+    )
+      return <Navigate to="/onboarding" />;
     return <>{children}</>;
   }
 
-  if (status === "checking") {
+  if (status === "checking" && !pending) {
     return (
-      <main className="flex min-h-dvh items-center justify-center bg-neutral-950 text-neutral-500">
-        Connecting to the community…
+      <main className="hive-app hive-entry">
+        <div className="hive-empty" role="status">
+          <h1>CreatorHive</h1>
+          <p>Connecting to your community…</p>
+        </div>
       </main>
     );
   }
 
   return (
     <Welcome
-      status={status}
-      reason={reason}
+      hasIdentity={!!identity && !pending}
+      onAuthenticate={async (mode, name, password) => {
+        setPending(true);
+        try {
+          if (mode === "register") await registerAccount(name, password);
+          else await loginAccount(name, password);
+          await getSocket(relayWsUrl()).waitForAuth(6_000);
+        } finally {
+          setPending(false);
+        }
+      }}
       onJoin={handleJoin}
-      onAdopt={adoptIdentity}
+      onSignOut={signOut}
     />
   );
 }

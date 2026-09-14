@@ -8,6 +8,10 @@
  * list a random key published would just be an opinion.
  */
 
+import {
+  isRelaySnapshot,
+  useRelayInfo,
+} from "@/features/community/community-access";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getSocket } from "@/shared/lib/nostr-socket";
 import { relayWsUrl } from "@/shared/lib/relay-url";
@@ -16,10 +20,12 @@ const KIND_GROUP_MEMBERS = 39002;
 
 export type ChannelMember = {
   pubkey: string;
-  role: "owner" | "member";
+  role: "owner" | "admin" | "member" | "guest" | "bot" | "unknown";
 };
 
 export function useMembers(channelId: string | null): ChannelMember[] {
+  const { data: relayInfo } = useRelayInfo();
+  const relayKey = relayInfo?.self;
   const socket = useMemo(() => getSocket(relayWsUrl()), []);
   const [members, setMembers] = useState<ChannelMember[]>([]);
   // Ordering bookkeeping, not render state: which membership snapshot is
@@ -27,7 +33,7 @@ export function useMembers(channelId: string | null): ChannelMember[] {
   const lastSeen = useRef(0);
 
   useEffect(() => {
-    if (!channelId) {
+    if (!channelId || !relayKey) {
       setMembers([]);
       return;
     }
@@ -37,6 +43,11 @@ export function useMembers(channelId: string | null): ChannelMember[] {
       [{ kinds: [KIND_GROUP_MEMBERS], "#d": [channelId], limit: 1 }],
       {
         onEvent: (event) => {
+          if (
+            !isRelaySnapshot(event, relayKey) ||
+            event.tags.find((t) => t[0] === "d")?.[1] !== channelId
+          )
+            return;
           // Addressable: the newest replaces, and the relay may replay it.
           if (event.created_at < lastSeen.current) {
             return;
@@ -47,14 +58,18 @@ export function useMembers(channelId: string | null): ChannelMember[] {
               .filter((t) => t[0] === "p" && typeof t[1] === "string")
               .map((t) => ({
                 pubkey: t[1].toLowerCase(),
-                role: t[3] === "owner" ? "owner" : "member",
+                role: (["owner", "admin", "member", "guest", "bot"].includes(
+                  t[3],
+                )
+                  ? t[3]
+                  : "unknown") as ChannelMember["role"],
               })),
           );
         },
       },
     );
     return unsubscribe;
-  }, [socket, channelId]);
+  }, [socket, channelId, relayKey]);
 
   return members;
 }

@@ -1,3 +1,5 @@
+import { Link } from "@tanstack/react-router";
+import { Workflow as WorkflowIcon, ChevronRight } from "lucide-react";
 import { useState } from "react";
 import { useChannels } from "@/features/chat/use-chat";
 import { useMembership } from "@/features/identity/use-identity";
@@ -51,7 +53,7 @@ function WorkflowDetail({
   }
 
   return (
-    <div className="border-neutral-800 border-t bg-neutral-900/40 px-4 py-4">
+    <div className="hive-workflow-detail border-neutral-800 border-t bg-neutral-900/40">
       <div className="flex flex-wrap items-center gap-2">
         <h3 className="font-semibold text-base">{workflow.name}</h3>
         <span className="text-neutral-500 text-xs">watches #{channelName}</span>
@@ -65,6 +67,7 @@ function WorkflowDetail({
       </div>
 
       <textarea
+        aria-label="Workflow definition"
         value={yaml}
         onChange={(e) => setYaml(e.target.value)}
         readOnly={!mine}
@@ -185,7 +188,6 @@ export function WorkflowsPage() {
   return (
     <SurfaceShell
       title="Workflows"
-      subtitle="Automation the whole room can read"
       action={
         <button
           type="button"
@@ -196,7 +198,13 @@ export function WorkflowsPage() {
         </button>
       }
     >
-      <div className="mx-auto max-w-2xl">
+      <div className="hive-feed">
+        <Link
+          to="/agents"
+          className="mb-5 inline-block text-sm text-amber-300 underline underline-offset-4"
+        >
+          ← Back to Agents
+        </Link>
         {creating ? (
           <div className="border-neutral-800 border-b px-4 py-4">
             <label
@@ -218,6 +226,7 @@ export function WorkflowsPage() {
               ))}
             </select>
             <textarea
+              aria-label="New workflow definition"
               value={newYaml}
               onChange={(e) => setNewYaml(e.target.value)}
               rows={12}
@@ -242,51 +251,69 @@ export function WorkflowsPage() {
         {loading && workflows.length === 0 ? (
           <p className="px-4 py-6 text-neutral-500 text-sm">loading…</p>
         ) : workflows.length === 0 && !creating ? (
-          <p className="px-4 py-6 text-neutral-500 text-sm">
-            No workflows yet. Create the first one: a YAML definition that
-            watches a channel and acts when its trigger fires.
-          </p>
-        ) : (
-          workflows.map((workflow) => (
-            <div key={workflow.id}>
-              <button
-                type="button"
-                onClick={() =>
-                  setOpenId(openId === workflow.id ? null : workflow.id)
-                }
-                className="flex w-full items-center gap-3 border-neutral-800 border-b px-4 py-3 text-left hover:bg-neutral-900"
-              >
-                <span aria-hidden="true">⚡</span>
-                <span className="min-w-0 flex-1">
-                  <span className="flex items-center gap-2">
-                    <b className="text-sm">{workflow.name}</b>
-                    {!workflow.enabled ? (
-                      <span className="rounded border border-neutral-700 px-1 text-neutral-500 text-xs">
-                        disabled
-                      </span>
-                    ) : null}
-                  </span>
-                  <span className="block text-neutral-500 text-xs">
-                    #{channelName(workflow.channelId)} · by{" "}
-                    {names(workflow.owner)} · {when(workflow.updatedAt)}
-                  </span>
-                </span>
-              </button>
-              {openId === workflow.id ? (
-                <WorkflowDetail
-                  workflow={workflow}
-                  channelName={channelName(workflow.channelId)}
-                  mine={workflow.owner === pubkey}
-                  onSave={(yaml) =>
-                    save(workflow.id, workflow.channelId ?? "", yaml)
-                  }
-                  onDelete={() => remove(workflow)}
-                  onRun={() => runNow(workflow)}
-                  onClose={() => setOpenId(null)}
-                />
-              ) : null}
+          <section>
+            <div className="hive-empty">
+              <WorkflowIcon aria-hidden="true" />
+              <h3>Make room for the work you love.</h3>
+              <p>
+                Create a workflow to watch a channel and act when a trigger
+                fires. Definitions stay visible to the community.
+              </p>
             </div>
-          ))
+          </section>
+        ) : (
+          <section aria-label="Community workflows">
+            {workflows.map((workflow) => (
+              <div key={workflow.id}>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setOpenId(openId === workflow.id ? null : workflow.id)
+                  }
+                  aria-expanded={openId === workflow.id}
+                  className="hive-list-row flex w-full items-center gap-3 border-neutral-800 border-b text-left hover:bg-neutral-900"
+                >
+                  <WorkflowIcon
+                    size={22}
+                    className="text-amber-400"
+                    aria-hidden="true"
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-2">
+                      <b className="text-sm">{workflow.name}</b>
+                      {!workflow.enabled ? (
+                        <span className="rounded border border-neutral-700 px-1 text-neutral-500 text-xs">
+                          disabled
+                        </span>
+                      ) : null}
+                    </span>
+                    <span className="block text-neutral-500 text-xs">
+                      #{channelName(workflow.channelId)} · by{" "}
+                      {names(workflow.owner)} · {when(workflow.updatedAt)}
+                    </span>
+                  </span>
+                  <ChevronRight
+                    size={17}
+                    className="text-neutral-500"
+                    aria-hidden="true"
+                  />
+                </button>
+                {openId === workflow.id ? (
+                  <WorkflowDetail
+                    workflow={workflow}
+                    channelName={channelName(workflow.channelId)}
+                    mine={workflow.owner === pubkey}
+                    onSave={(yaml) =>
+                      save(workflow.id, workflow.channelId ?? "", yaml)
+                    }
+                    onDelete={() => remove(workflow)}
+                    onRun={() => runNow(workflow)}
+                    onClose={() => setOpenId(null)}
+                  />
+                ) : null}
+              </div>
+            ))}
+          </section>
         )}
       </div>
     </SurfaceShell>

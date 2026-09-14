@@ -1,9 +1,13 @@
+import { Cloud } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import {
   cloudAgentLog,
   createCloudAgent,
   deleteCloudAgent,
   listCloudAgents,
+  listCloudModels,
+  legacyCloudModels,
+  type CloudModel,
   pauseCloudAgent,
   resumeCloudAgent,
   retireManagedRecord,
@@ -18,11 +22,12 @@ import { cn } from "@/shared/lib/cn";
  * The cloud tier: agents that live on CreatorHive's servers and never sleep.
  *
  * The form enforces the key policy in copy before the keeper enforces it in
- * code: a real model needs the member's own Anthropic API key. Echo is the
+ * code: a real model needs the member's own provider API key. Echo is the
  * keyless demo lane. The key is sent once over TLS to the keeper, sealed at
  * rest there, and never stored in the browser.
  */
 export function CloudAgents() {
+  const [models, setModels] = useState<CloudModel[]>(legacyCloudModels);
   const [agents, setAgents] = useState<CloudAgent[] | null>(null);
   const [unavailable, setUnavailable] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -43,7 +48,12 @@ export function CloudAgents() {
 
   const refresh = useCallback(async () => {
     try {
-      setAgents(await listCloudAgents());
+      const [agents, models] = await Promise.all([
+        listCloudAgents(),
+        listCloudModels(),
+      ]);
+      setAgents(agents);
+      setModels(models);
       setUnavailable(false);
     } catch {
       // A member who has never made an agent should not see an error wall
@@ -117,22 +127,24 @@ export function CloudAgents() {
     }
   }
 
-  const needsKey = form.model !== "echo";
+  const selectedModel = models.find((model) => model.id === form.model);
+  const isOpenRouter = selectedModel?.provider === "openrouter";
+  const needsKey = selectedModel?.provider !== "echo";
 
   return (
-    <section className="border-neutral-800 border-b pb-4">
-      <div className="flex items-center gap-2 px-4 pt-4 pb-1">
-        <h2 className="font-semibold text-neutral-500 text-xs uppercase tracking-wide">
-          My cloud agents
-        </h2>
-        <span className="rounded border border-emerald-800 px-1 text-emerald-400 text-xs">
-          always on
-        </span>
+    <section>
+      <div className="hive-section-heading">
+        <Cloud size={20} aria-hidden="true" />
+        <div>
+          <h2>My cloud agents</h2>
+          <p>Your hosted agents and their runtime status.</p>
+        </div>
         <button
           type="button"
           onClick={() => {
             setCreating((c) => !c);
             setAdopting(false);
+            setForm((form) => ({ ...form, api_key: "", nsec: undefined }));
           }}
           className="ml-auto rounded-lg bg-amber-500 px-2.5 py-1 font-semibold text-neutral-950 text-xs"
         >
@@ -147,30 +159,57 @@ export function CloudAgents() {
       ) : null}
 
       {creating ? (
-        <div className="mx-4 mt-2 rounded-xl border border-neutral-800 bg-neutral-900/40 p-3">
-          <div className="flex gap-2">
+        <div className="hive-cloud-form">
+          <div className="flex flex-wrap gap-2">
             <input
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
+              aria-label="Agent name"
               placeholder="Agent name"
               maxLength={40}
-              className="min-w-0 flex-1 rounded-lg border border-neutral-800 bg-neutral-950 px-2.5 py-1.5 text-sm outline-none focus:border-neutral-600"
+              className="min-w-0 w-full rounded-lg border border-neutral-800 bg-neutral-950 px-2.5 py-1.5 text-sm outline-none focus:border-neutral-600"
             />
             <select
+              aria-label="Model"
               value={form.model}
               onChange={(e) =>
                 setForm({
                   ...form,
-                  model: e.target.value as CreateAgentInput["model"],
+                  model: e.target.value,
+                  api_key:
+                    models.find((model) => model.id === e.target.value)
+                      ?.provider === selectedModel?.provider
+                      ? form.api_key
+                      : "",
                 })
               }
-              className="rounded-lg border border-neutral-800 bg-neutral-950 px-2 py-1.5 text-sm outline-none"
+              className="min-w-0 max-w-full rounded-lg border border-neutral-800 bg-neutral-950 px-2 py-1.5 text-sm outline-none"
             >
-              <option value="echo">echo (free test)</option>
-              <option value="haiku">haiku</option>
-              <option value="sonnet">sonnet</option>
+              {(["echo", "anthropic", "openrouter"] as const).map(
+                (provider) => (
+                  <optgroup
+                    key={provider}
+                    label={
+                      provider === "openrouter"
+                        ? "OpenRouter"
+                        : provider === "anthropic"
+                          ? "Anthropic"
+                          : "Test agent"
+                    }
+                  >
+                    {models
+                      .filter((model) => model.provider === provider)
+                      .map((model) => (
+                        <option key={model.id} value={model.id}>
+                          {model.label}
+                        </option>
+                      ))}
+                  </optgroup>
+                ),
+              )}
             </select>
             <select
+              aria-label="Who the agent responds to"
               value={form.respond_to}
               onChange={(e) =>
                 setForm({
@@ -184,7 +223,15 @@ export function CloudAgents() {
               <option value="owner-only">answers only me</option>
             </select>
           </div>
+          {!models.some((model) => model.provider === "openrouter") && (
+            <p className="mt-2 text-neutral-400 text-xs">
+              OpenRouter models will appear here when the cloud service supports
+              them.
+            </p>
+          )}
           <textarea
+            maxLength={4000}
+            aria-label="Agent persona"
             value={form.system_prompt}
             onChange={(e) =>
               setForm({ ...form, system_prompt: e.target.value })
@@ -196,17 +243,30 @@ export function CloudAgents() {
           {needsKey ? (
             <div className="mt-2">
               <input
+                aria-label={
+                  isOpenRouter
+                    ? "Your OpenRouter API key"
+                    : "Your Anthropic API key"
+                }
                 value={form.api_key}
                 onChange={(e) => setForm({ ...form, api_key: e.target.value })}
-                placeholder="Your Anthropic API key (sk-ant-…)"
+                placeholder={
+                  isOpenRouter
+                    ? "Your OpenRouter API key (sk-or-…)"
+                    : "Your Anthropic API key (sk-ant-…)"
+                }
+                maxLength={512}
                 type="password"
                 autoComplete="off"
                 className="w-full rounded-lg border border-neutral-800 bg-neutral-950 px-2.5 py-1.5 font-mono text-sm outline-none focus:border-neutral-600"
               />
               <p className="mt-1 text-neutral-600 text-xs">
-                Cloud agents run on your key and your budget. It is sent once
-                over TLS, stored encrypted on the server, never in this browser.
-                Pick echo to try the plumbing without one.
+                {isOpenRouter
+                  ? "Model usage is billed to your OpenRouter account. "
+                  : "Cloud agents use your own provider account. "}
+                Your key is sent securely to the cloud service and stored
+                encrypted. It is not saved on this device or included in
+                community messages. Choose Echo for a free test.
               </p>
             </div>
           ) : (
@@ -218,7 +278,7 @@ export function CloudAgents() {
           <div className="mt-2 flex items-center gap-2">
             <button
               type="button"
-              disabled={busy}
+              disabled={busy || !selectedModel}
               onClick={() => void onCreate()}
               className="rounded-lg bg-amber-500 px-3 py-1.5 font-semibold text-neutral-950 text-xs disabled:opacity-40"
             >
@@ -235,6 +295,7 @@ export function CloudAgents() {
           {adopting ? (
             <div className="mt-2">
               <input
+                aria-label="Agent backup key"
                 value={form.nsec ?? ""}
                 onChange={(e) => setForm({ ...form, nsec: e.target.value })}
                 placeholder="The agent's nsec key, exported from the desktop app"
@@ -252,21 +313,32 @@ export function CloudAgents() {
       ) : null}
 
       {unavailable && !creating ? (
-        <p className="px-4 py-2 text-neutral-600 text-sm">
-          The cloud agent service is not reachable right now.
-        </p>
+        <div className="hive-notice" role="status">
+          <strong>Cloud service unavailable</strong>
+          <p>
+            We can’t retrieve your hosted agents right now. Their running status
+            is unknown.
+          </p>
+          <button
+            type="button"
+            className="mt-2 rounded border border-neutral-600 px-3 py-1.5"
+            onClick={() => void refresh()}
+          >
+            Try again
+          </button>
+        </div>
       ) : null}
 
       {agents !== null && agents.length === 0 && !creating && !unavailable ? (
         <p className="px-4 py-2 text-neutral-600 text-sm">
-          None yet. Cloud agents live on CreatorHive's servers and never sleep.
-          Create one, or promote a desktop agent.
+          You haven’t created a cloud agent yet. Create one or bring an existing
+          desktop agent to CreatorHive’s servers.
         </p>
       ) : null}
 
       {(agents ?? []).map((agent) => (
-        <div key={agent.pubkey} className="px-4 py-2">
-          <div className="flex items-center gap-2">
+        <div key={agent.pubkey} className="hive-list-row">
+          <div className="flex flex-wrap items-center gap-2">
             <AvatarDisc pubkey={agent.pubkey} name={agent.name} size={26} />
             <b className="text-sm">{agent.name}</b>
             <span

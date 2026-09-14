@@ -11,7 +11,8 @@
  * state would mean as many subscriptions and as many chances to disagree.
  */
 
-import type { NostrEvent } from "@/shared/lib/nostr-client";
+import { loadIdentity } from "@/shared/lib/identity";
+import { type NostrEvent, queryEvents } from "@/shared/lib/nostr-client";
 import { getSocket } from "@/shared/lib/nostr-socket";
 import { relayWsUrl } from "@/shared/lib/relay-url";
 import { signNostrEvent } from "@/shared/lib/nostr-signer";
@@ -127,7 +128,13 @@ export function nameFromSnapshot(
   pubkeyHex: string,
 ): string {
   const profile = snap.profiles.get(pubkeyHex.toLowerCase());
-  return profile?.displayName ?? truncatePubkey(pubkeyHex);
+  const account = loadIdentity();
+  return (
+    profile?.displayName ??
+    (account?.pubkey === pubkeyHex && account.username
+      ? `@${account.username}`
+      : truncatePubkey(pubkeyHex))
+  );
 }
 
 /**
@@ -142,16 +149,43 @@ export async function publishDisplayName(
   selfPubkey: string,
   displayName: string,
 ): Promise<void> {
-  const existing = profiles.get(selfPubkey.toLowerCase());
+  const name = displayName.trim();
+  if (!name || name.length > 60)
+    throw new Error("Use a display name between 1 and 60 characters.");
+  // A new route can save before the shared profile subscription is hydrated.
+  // Read the current replaceable event first so existing fields are not erased.
+  const events = await queryEvents(relayWsUrl(), {
+    kinds: [0],
+    authors: [selfPubkey],
+    limit: 1,
+  });
+  const latest = events
+    .filter((event) => event.kind === 0 && event.pubkey === selfPubkey)
+    .sort((a, b) => b.created_at - a.created_at)[0];
+  const existing = latest
+    ? parseProfile(latest)
+    : profiles.get(selfPubkey.toLowerCase());
+  if (latest && !existing)
+    throw new Error(
+      "Could not read your existing profile. Try again before saving.",
+    );
   const content: Record<string, unknown> = {
     ...(existing?.raw ?? {}),
-    display_name: displayName.trim(),
+    display_name: name,
   };
   const event = await signNostrEvent({
     kind: 0,
     content: JSON.stringify(content),
+    created_at: Math.max(
+      Math.floor(Date.now() / 1000),
+      (existing?.createdAt ?? 0) + 1,
+    ),
     tags: [],
   });
+  if (event.pubkey !== selfPubkey)
+    throw new Error(
+      "Your signed-in profile changed. Reopen your account and try again.",
+    );
   const result = await getSocket(relayWsUrl()).publish(event);
   if (!result.accepted) {
     throw new Error(result.reason || "the relay refused the profile");
@@ -162,4 +196,11 @@ export async function publishDisplayName(
     profiles.set(selfPubkey.toLowerCase(), next);
     emit();
   }
+}
+
+/** Clear account-scoped subscriptions and data on sign-out. */
+export function resetProfiles(): void {
+  profiles.clear();
+  started = false;
+  emit();
 }

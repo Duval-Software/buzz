@@ -66,6 +66,8 @@ pub struct ConnectionState {
     pub remote_addr: SocketAddr,
     /// Current NIP-42 authentication state.
     pub auth_state: RwLock<AuthState>,
+    /// Hashed credential session, checked before frames and periodically while subscribed.
+    pub account_session: RwLock<(Option<String>, Option<nostr::PublicKey>)>,
     /// Active subscriptions keyed by subscription ID.
     pub subscriptions: ConnectionSubscriptions,
     /// Sender for outbound data messages (EVENT, NOTICE, OK, etc.).
@@ -181,6 +183,7 @@ async fn handle_active_connection(
         auth_state: RwLock::new(AuthState::Pending {
             challenge: challenge.clone(),
         }),
+        account_session: RwLock::new((None, None)),
         subscriptions: Arc::clone(&subscriptions),
         send_tx: tx.clone(),
         ctrl_tx: ctrl_tx.clone(),
@@ -430,6 +433,30 @@ async fn heartbeat_loop(
     }
 }
 
+/// Re-check durable session revocation on every incoming frame and at most five seconds apart.
+async fn credential_session_valid(conn: &ConnectionState, state: &AppState) -> bool {
+    let key = match &*conn.auth_state.read().await {
+        AuthState::Authenticated(context) => context.pubkey,
+        _ => return true,
+    };
+    let (session, owner) = conn.account_session.read().await.clone();
+    let allowed = crate::api::accounts::has_account_session(
+        state,
+        &conn.tenant,
+        &key,
+        owner.as_ref(),
+        session.as_deref(),
+    )
+    .await;
+    if !allowed {
+        conn.send(RelayMessage::notice(
+            "auth-required: Session expired. Sign in again.",
+        ));
+        conn.cancel.cancel();
+    }
+    allowed
+}
+
 async fn recv_loop(
     mut ws_recv: futures_util::stream::SplitStream<WebSocket>,
     conn: Arc<ConnectionState>,
@@ -437,9 +464,14 @@ async fn recv_loop(
     missed_pongs: Arc<AtomicU8>,
     cancel: CancellationToken,
 ) {
+    let mut session_check = tokio::time::interval(Duration::from_secs(5));
     loop {
         tokio::select! {
+            _ = session_check.tick() => {
+                if !credential_session_valid(&conn,&state).await { break; }
+            }
             msg = ws_recv.next() => {
+                if !credential_session_valid(&conn,&state).await { break; }
                 match msg {
                     Some(Ok(WsMessage::Text(text))) => {
                         let max_frame_bytes = state.config.max_frame_bytes;

@@ -215,6 +215,7 @@ async fn handle_active_audio_connection(
 
     // Extract NIP-OA auth tag before verify_auth_event consumes the event.
     let auth_tag_json = crate::handlers::auth::extract_auth_tag_json(&auth_msg.event);
+    let account_session = crate::api::accounts::session_hash(&auth_msg.event);
 
     let relay_url = crate::api::bridge::nip42_expected_relay_url(&state.config.relay_url, &tenant);
     let auth_ctx = match state
@@ -237,6 +238,21 @@ async fn handle_active_audio_connection(
     };
 
     let pubkey = auth_ctx.pubkey;
+    let credential_owner = crate::api::relay_members::extract_nip_oa_owner(
+        pubkey.as_bytes(),
+        auth_tag_json.as_deref(),
+    );
+    if !crate::api::accounts::has_account_session(
+        &state,
+        &tenant,
+        &pubkey,
+        credential_owner.as_ref(),
+        account_session.as_deref(),
+    )
+    .await
+    {
+        return;
+    }
     let pubkey_hex = pubkey.to_hex();
     let pubkey_bytes = pubkey.to_bytes().to_vec();
     let parent_channel_id = auth_msg.parent_channel_id;
@@ -769,6 +785,22 @@ async fn handle_active_audio_connection(
         None
     };
 
+    let session_state = state.clone();
+    let session_cancel = cancel.clone();
+    let session_tenant = tenant.clone();
+    let session_task = tokio::spawn(async move {
+        let mut interval = tokio::time::interval(Duration::from_secs(5));
+        loop {
+            tokio::select! {
+                _ = session_cancel.cancelled() => break,
+                _ = interval.tick() => {
+                    if !crate::api::accounts::has_account_session(&session_state,&session_tenant,&pubkey,credential_owner.as_ref(),account_session.as_deref()).await {
+                        session_cancel.cancel(); break;
+                    }
+                }
+            }
+        }
+    });
     recv_loop(
         ws_recv,
         Arc::clone(&room),
@@ -782,6 +814,7 @@ async fn handle_active_audio_connection(
     .await;
 
     cancel.cancel();
+    let _ = session_task.await;
     let _ = send_task.await;
     let _ = heartbeat_task.await;
     let _ = forward_task.await;

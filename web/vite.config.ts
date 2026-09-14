@@ -1,12 +1,13 @@
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [
     tanstackRouter({
       target: "react",
+      autoCodeSplitting: true,
       routesDirectory: "./src/app/routes",
       generatedRouteTree: "./src/app/routeTree.gen.ts",
       virtualRouteConfig: "./src/app/routes.ts",
@@ -26,6 +27,23 @@ export default defineConfig({
   server: {
     port: parseInt(process.env.VITE_PORT || "5173", 10),
     proxy: {
+      // Public capability document only. Local browser origins are not allowed
+      // by the deployed relay's CORS configuration; no authenticated API is proxied here.
+      "^/relay-info$": {
+        target: (
+          loadEnv(mode, process.cwd(), "VITE_").VITE_RELAY_URL ||
+          "ws://127.0.0.1:3000"
+        ).replace(/^ws/, "http"),
+        changeOrigin: true,
+        rewrite: () => "/info",
+      },
+      "/api/accounts": {
+        target: (
+          loadEnv(mode, process.cwd(), "VITE_").VITE_RELAY_URL ||
+          "ws://127.0.0.1:3000"
+        ).replace(/^ws/, "http"),
+        changeOrigin: true,
+      },
       // Blossom uploads are same-origin in production (Caddy proxies /upload
       // to the relay); this gives dev the same shape, so the client code has
       // exactly one path.
@@ -42,4 +60,4 @@ export default defineConfig({
     },
     strictPort: true,
   },
-});
+}));

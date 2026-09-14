@@ -1,20 +1,18 @@
+import { UserRound } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { CredentialForm } from "./CredentialForm";
+import {
+  changeAccountPassword,
+  registerAccount,
+} from "@/features/identity/accounts";
+import { CommunityDialog } from "@/features/surfaces/ui/CommunityDialog";
 import { useState } from "react";
 import { NotificationSettings } from "@/features/notifications/ui/NotificationSettings";
 import { publishDisplayName } from "@/features/profile/profile-store";
 import { useProfile } from "@/features/profile/use-profiles";
 import { exportIdentity, type StoredIdentity } from "@/shared/lib/identity";
 
-/**
- * Backup and sign-out.
- *
- * The uncomfortable truth this screen has to convey: a key in localStorage is
- * gone forever if the browser data is cleared, and there is no reset link,
- * because nobody is holding a copy. So the backup is offered plainly rather
- * than buried, and signing out says what it costs before it does it.
- *
- * The secret stays hidden until asked for. Someone screen-sharing a chat window
- * should not have their key on screen because they opened the wrong panel.
- */
+/** Profile, credentials and legacy migration without changing membership. */
 export function IdentityPanel({
   identity,
   onClose,
@@ -22,11 +20,12 @@ export function IdentityPanel({
 }: {
   identity: StoredIdentity;
   onClose: () => void;
-  onSignOut: () => void;
+  onSignOut: () => Promise<void>;
 }) {
   const profile = useProfile(identity.pubkey);
   const [nameDraft, setNameDraft] = useState(profile?.displayName ?? "");
   const [nameBusy, setNameBusy] = useState(false);
+  const [accessBusy, setAccessBusy] = useState(false);
   const [nameNote, setNameNote] = useState<string | null>(null);
   const [revealed, setRevealed] = useState(false);
   const [copied, setCopied] = useState<"npub" | "nsec" | null>(null);
@@ -44,31 +43,34 @@ export function IdentityPanel({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-      {/* Capped and scrollable: with the notification section added this is
-          taller than a phone screen. */}
-      <div className="max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-2xl border border-neutral-800 bg-neutral-950 p-5 text-neutral-200">
-        <div className="flex items-start justify-between gap-4">
-          <h2 className="font-semibold text-amber-400 text-lg">
-            Your identity
-          </h2>
-          <button
-            type="button"
+    <CommunityDialog
+      label="Your account"
+      description="Your profile, notifications, and access."
+      icon={UserRound}
+      busy={nameBusy || accessBusy}
+      onClose={onClose}
+    >
+      <div className="hive-identity">
+        <div className="hive-profile-intro">
+          <Link
+            to="/community"
             onClick={onClose}
-            className="text-neutral-500 text-sm"
+            className="mt-2 inline-block text-amber-400 underline underline-offset-4"
           >
-            Close
-          </button>
+            Community settings
+          </Link>
         </div>
 
-        <p className="mt-1 text-neutral-500 text-xs">
-          This is who you are in the community. Share the public one freely.
-        </p>
-
         <div className="mt-4">
-          <span className="text-neutral-400 text-xs">Display name</span>
+          <label
+            htmlFor="profile-display-name"
+            className="text-neutral-400 text-xs"
+          >
+            Display name
+          </label>
           <div className="mt-1 flex items-center gap-2">
             <input
+              id="profile-display-name"
               value={nameDraft}
               onChange={(event) => setNameDraft(event.target.value)}
               maxLength={60}
@@ -83,7 +85,7 @@ export function IdentityPanel({
                 setNameNote(null);
                 try {
                   await publishDisplayName(identity.pubkey, nameDraft);
-                  setNameNote("Saved. Everyone sees this instead of your key.");
+                  setNameNote("Saved. Everyone sees your updated name.");
                 } catch (cause) {
                   setNameNote(
                     cause instanceof Error ? cause.message : "could not save",
@@ -102,51 +104,100 @@ export function IdentityPanel({
           ) : null}
         </div>
 
-        <div className="mt-4">
-          <span className="text-neutral-400 text-xs">Public key</span>
-          <div className="mt-1 flex items-center gap-2">
-            <code className="min-w-0 flex-1 truncate rounded-lg border border-neutral-800 bg-neutral-900 px-2 py-1.5 text-xs">
-              {identity.npub}
-            </code>
-            <button
-              type="button"
-              onClick={() => copy(identity.npub, "npub")}
-              className="rounded-lg border border-neutral-700 px-2 py-1.5 text-xs"
-            >
-              {copied === "npub" ? "Copied" : "Copy"}
-            </button>
-          </div>
-        </div>
-
-        <div className="mt-5 rounded-xl border border-amber-900/60 bg-amber-950/20 p-3">
-          <span className="font-medium text-amber-300 text-sm">Backup key</span>
-          <p className="mt-1 text-neutral-400 text-xs">
-            Anyone with this can post as you. Save it somewhere private. If you
-            clear this browser's data without it, this identity is gone and
-            cannot be recovered by anyone.
+        <section className="mt-5">
+          <h3 className="font-semibold">
+            {identity.username
+              ? `Signed in as @${identity.username}`
+              : "Give your profile a login"}
+          </h3>
+          <p className="hive-entry-note">
+            {identity.username
+              ? "Use your username and password on another device. Your community access stays the same."
+              : "Create a username and password for this profile. Your messages, memberships and roles stay with you."}
           </p>
-          {revealed && nsec ? (
-            <div className="mt-2 flex items-center gap-2">
-              <code className="min-w-0 flex-1 truncate rounded-lg border border-neutral-800 bg-neutral-900 px-2 py-1.5 text-xs">
-                {nsec}
-              </code>
-              <button
-                type="button"
-                onClick={() => copy(nsec, "nsec")}
-                className="rounded-lg border border-neutral-700 px-2 py-1.5 text-xs"
-              >
-                {copied === "nsec" ? "Copied" : "Copy"}
-              </button>
+          <details className="mt-3" open={!identity.username}>
+            <summary>
+              {identity.username ? "Change password" : "Create your login"}
+            </summary>
+            <CredentialForm
+              key={identity.username ?? "migrate"}
+              mode={identity.username ? "password" : "register"}
+              username={identity.username}
+              onSubmit={async (name, password, newPassword) => {
+                setAccessBusy(true);
+                try {
+                  if (identity.username)
+                    await changeAccountPassword(password, newPassword);
+                  else await registerAccount(name, password);
+                } finally {
+                  setAccessBusy(false);
+                }
+              }}
+            />
+          </details>
+        </section>
+        {!identity.username && (
+          <details className="mt-5">
+            <summary>Legacy account backup</summary>
+            <div className="mt-4">
+              <span className="text-neutral-400 text-xs">Public key</span>
+              <div className="mt-1 flex items-center gap-2">
+                <code className="min-w-0 flex-1 truncate rounded-lg border border-neutral-800 bg-neutral-900 px-2 py-1.5 text-xs">
+                  {identity.npub}
+                </code>
+                <button
+                  type="button"
+                  onClick={() => copy(identity.npub, "npub")}
+                  className="rounded-lg border border-neutral-700 px-2 py-1.5 text-xs"
+                >
+                  {copied === "npub" ? "Copied" : "Copy"}
+                </button>
+              </div>
             </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setRevealed(true)}
-              className="mt-2 rounded-lg border border-amber-700 px-3 py-1.5 text-amber-300 text-sm"
-            >
-              Show my backup key
-            </button>
-          )}
+
+            <div className="mt-5 rounded-xl border border-amber-900/60 bg-amber-950/20 p-3">
+              <span className="font-medium text-amber-300 text-sm">
+                Backup key
+              </span>
+              <p className="mt-1 text-neutral-400 text-xs">
+                Anyone with this can post as you. Save it somewhere private. If
+                you clear this browser's data without it, this identity is gone
+                and cannot be recovered by anyone.
+              </p>
+              {revealed && nsec ? (
+                <div className="mt-2 flex items-center gap-2">
+                  <code className="min-w-0 flex-1 truncate rounded-lg border border-neutral-800 bg-neutral-900 px-2 py-1.5 text-xs">
+                    {nsec}
+                  </code>
+                  <button
+                    type="button"
+                    onClick={() => copy(nsec, "nsec")}
+                    className="rounded-lg border border-neutral-700 px-2 py-1.5 text-xs"
+                  >
+                    {copied === "nsec" ? "Copied" : "Copy"}
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setRevealed(true)}
+                  className="mt-2 rounded-lg border border-amber-700 px-3 py-1.5 text-amber-300 text-sm"
+                >
+                  Show my backup key
+                </button>
+              )}
+            </div>
+          </details>
+        )}
+
+        <div className="mt-5">
+          <Link
+            to="/onboarding"
+            onClick={onClose}
+            className="text-amber-300 underline underline-offset-4"
+          >
+            Revisit the community welcome
+          </Link>
         </div>
 
         <NotificationSettings />
@@ -155,16 +206,27 @@ export function IdentityPanel({
           {confirmingSignOut ? (
             <div className="flex flex-col gap-2">
               <p className="text-neutral-300 text-sm">
-                Sign out and forget this key on this device? Without a backup
-                you cannot get this identity back.
+                {identity.username
+                  ? "Sign out of this browser? You can sign back in with your username and password."
+                  : "Create a login or save your legacy backup before signing out, so you can return to this profile."}
               </p>
               <div className="flex gap-2">
                 <button
                   type="button"
-                  onClick={onSignOut}
+                  onClick={async () => {
+                    try {
+                      await onSignOut();
+                    } catch (cause) {
+                      setNameNote(
+                        cause instanceof Error
+                          ? cause.message
+                          : "Could not sign out.",
+                      );
+                    }
+                  }}
                   className="rounded-lg bg-red-900 px-3 py-1.5 text-red-100 text-sm"
                 >
-                  Forget it
+                  Sign out
                 </button>
                 <button
                   type="button"
@@ -186,6 +248,6 @@ export function IdentityPanel({
           )}
         </div>
       </div>
-    </div>
+    </CommunityDialog>
   );
 }

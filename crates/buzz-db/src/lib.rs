@@ -10,6 +10,7 @@
 //! - Uses `sqlx::query()` (runtime) not `sqlx::query!()` (compile-time).
 
 /// Explicit deployment-global admin report reads.
+pub mod account;
 pub mod admin_moderation;
 /// API token storage and lookup.
 pub mod api_token;
