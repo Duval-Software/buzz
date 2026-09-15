@@ -6,6 +6,7 @@ pnpm-debug.log*
 
 node_modules
 dist
+dist-cloudflare
 dist-ssr
 *.local
 playwright-report

@@ -1,4 +1,6 @@
 import { relayWsUrl } from "@/shared/lib/relay-url";
+import { supabase } from "@/shared/lib/supabase";
+import type { User } from "@supabase/supabase-js";
 
 // Only tour progress belongs here. Membership and permissions come from the relay.
 const fallback = new Map<string, string>();
@@ -28,4 +30,28 @@ export function needsOnboarding(pubkey: string): boolean {
   } catch {
     return fallback.get(id) === "pending";
   }
+}
+
+/** Account metadata is tour progress only, never membership or paid access. */
+export function syncManagedOnboarding(pubkey: string, user: User) {
+  const completed = user.user_metadata?.creatorhive_onboarding?.[relayWsUrl()];
+  setOnboardingStatus(pubkey, completed?.version === 1 ? "done" : "pending");
+}
+
+/** Remember completion across browsers before leaving the welcome flow. */
+export async function completeManagedOnboarding() {
+  if (!supabase)
+    throw new Error("Account service is unavailable. Please retry.");
+  const { data, error } = await supabase.auth.getUser();
+  if (error) throw error;
+  if (!data.user) throw new Error("Please sign in again to continue.");
+  const { error: saveError } = await supabase.auth.updateUser({
+    data: {
+      creatorhive_onboarding: {
+        ...data.user.user_metadata?.creatorhive_onboarding,
+        [relayWsUrl()]: { version: 1, completed_at: new Date().toISOString() },
+      },
+    },
+  });
+  if (saveError) throw saveError;
 }

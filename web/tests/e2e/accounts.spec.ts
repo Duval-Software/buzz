@@ -88,7 +88,7 @@ async function fillSignup(page: Page) {
 }
 
 async function signOut(page: Page) {
-  await page.getByRole("button", { name: /Your profile/ }).click();
+  await page.getByRole("button", { name: /^Account/ }).click();
   await page.getByRole("button", { name: "Sign out of this browser" }).click();
   await page.getByRole("button", { name: "Sign out", exact: true }).click();
   await expect(
@@ -118,9 +118,7 @@ test("credential lifecycle survives a fresh browser state and keeps secrets out 
     .getByRole("button", { name: "Create account", exact: true })
     .click();
   await page.getByRole("button", { name: "Skip for now" }).click();
-  await expect(
-    page.getByRole("button", { name: /Your profile/ }),
-  ).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Account/ })).toBeVisible();
   const record = records.get("studio_sean");
   expect(record).toBeDefined();
   expect(JSON.stringify(record?.vault)).not.toContain(password);
@@ -137,7 +135,7 @@ test("credential lifecycle survives a fresh browser state and keeps secrets out 
   );
   await page.getByLabel("Password", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await page.getByRole("button", { name: /Your profile/ }).click();
+  await page.getByRole("button", { name: /^Account/ }).click();
   await expect(page.getByText("Signed in as @studio_sean")).toBeVisible();
   await expect(page.getByText("Backup key", { exact: true })).toHaveCount(0);
   await page.getByText("Change password", { exact: true }).click();
@@ -149,10 +147,8 @@ test("credential lifecycle survives a fresh browser state and keeps secrets out 
     .getByLabel("Confirm password", { exact: true })
     .fill("another secure studio password");
   await page.getByRole("button", { name: "Update password" }).click();
-  await expect(
-    page.getByRole("button", { name: /Your profile/ }),
-  ).toBeVisible();
-  await page.getByRole("button", { name: /Your profile/ }).click();
+  await expect(page.getByRole("button", { name: /^Account/ })).toBeVisible();
+  await page.getByRole("button", { name: /^Account/ }).click();
   await expect(page.getByText("Signed in as @studio_sean")).toBeVisible();
   expect(records.get("studio_sean")?.pubkey).toBe(record?.pubkey);
   await page.getByRole("button", { name: "Close", exact: true }).click();
@@ -165,9 +161,7 @@ test("credential lifecycle survives a fresh browser state and keeps secrets out 
     .getByLabel("Password", { exact: true })
     .fill("another secure studio password");
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await expect(
-    page.getByRole("button", { name: /Your profile/ }),
-  ).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Account/ })).toBeVisible();
 });
 
 test("existing profile gains credentials without changing its identity", async ({
@@ -176,14 +170,14 @@ test("existing profile gains credentials without changing its identity", async (
   const fixture = await installCommunityFixture(page);
   const records = await installAccounts(page);
   await page.goto("/chat");
-  await page.getByRole("button", { name: /Your profile/ }).click();
+  await page.getByRole("button", { name: /^Account/ }).click();
   await page.getByLabel("Username", { exact: true }).fill("existing_member");
   await page.getByLabel("Password", { exact: true }).fill(password);
   await page.getByLabel("Confirm password", { exact: true }).fill(password);
   await page
     .getByRole("button", { name: "Create account", exact: true })
     .click();
-  await page.getByRole("button", { name: /Your profile/ }).click();
+  await page.getByRole("button", { name: /^Account/ }).click();
   await expect(page.getByText("Signed in as @existing_member")).toBeVisible();
   expect(records.get("existing_member")?.pubkey).toBe(fixture.self);
   expect(
@@ -205,9 +199,7 @@ test("registration does not bypass community admission", async ({ page }) => {
   await expect(
     page.getByRole("heading", { name: "Join the conversation" }),
   ).toBeVisible();
-  await expect(page.getByRole("button", { name: /Your profile/ })).toHaveCount(
-    0,
-  );
+  await expect(page.getByRole("button", { name: /^Account/ })).toHaveCount(0);
 });
 
 test("tampered account backup cannot unlock a profile", async ({ page }) => {
@@ -340,7 +332,7 @@ test("invited members use credentials, consent and signed claims without losing 
   await page.getByRole("button", { name: "Skip for now" }).click();
   await expect(page).toHaveURL("/chat");
   await page.getByRole("button", { name: "Channels", exact: true }).click();
-  await page.getByRole("button", { name: /Your profile/ }).click();
+  await page.getByRole("button", { name: /^Account/ }).click();
   await expect(page.getByText("Signed in as @invited_sean")).toBeVisible();
   expect(claims).toBe(2);
   expect(receipts).toBe(2);

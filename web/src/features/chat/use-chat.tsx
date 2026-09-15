@@ -242,7 +242,13 @@ export function useChannels(): ChannelState {
  * settles when the relay accepts it, or shows why it was refused. Silent drops
  * are the worst outcome in chat, so a refusal is always visible.
  */
-export function useMessages(channelId: string | null): {
+export function useMessages(
+  channelId: string | null,
+  targetId?: string,
+): {
+  targetLoading: boolean;
+  targetError: string;
+  retryTarget: () => void;
   messages: ChatMessage[];
   loading: boolean;
   send: (
@@ -261,6 +267,9 @@ export function useMessages(channelId: string | null): {
   const [edits, setEdits] = useState<Map<string, NostrEvent>>(new Map());
   const [deletions, setDeletions] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(Boolean(channelId));
+  const [targetLoading, setTargetLoading] = useState(false);
+  const [targetError, setTargetError] = useState("");
+  const [targetRetry, setTargetRetry] = useState(0);
   // Our own optimistic ids, so the echo from the relay replaces rather than
   // duplicates them.
   const pendingIds = useRef<Set<string>>(new Set());
@@ -280,6 +289,57 @@ export function useMessages(channelId: string | null): {
       return next;
     });
   }, []);
+
+  const remember = useCallback(
+    (event: NostrEvent) => {
+      if (
+        !channelId ||
+        !event.tags.some((tag) => tag[0] === "h" && tag[1] === channelId)
+      )
+        return;
+
+      if (event.kind === KIND_EDIT) {
+        noteEdit(event);
+        return;
+      }
+      if (event.kind === KIND_DELETE) {
+        const target = event.tags.find((t) => t[0] === "e")?.[1];
+        if (target) {
+          setDeletions((prev) => {
+            const next = new Map(prev);
+            next.set(target, event.pubkey.toLowerCase());
+            return next;
+          });
+        }
+        return;
+      }
+      setBase((prev) => {
+        if (prev.some((m) => m.id === event.id && !m.pending)) {
+          return prev;
+        }
+        pendingIds.current.delete(event.id);
+        const next = [
+          ...prev.filter((m) => m.id !== event.id),
+          {
+            id: event.id,
+            channelId,
+            pubkey: event.pubkey,
+            content: event.content,
+            createdAt: event.created_at,
+            threadRoot: threadRootOf(event),
+            replyTo: replyTarget(event),
+            media: mediaOf(event),
+            mentions: mentionsOf(event),
+            emoji: emojiFromTags(event.tags),
+            carryTags: carryTagsOf(event),
+          },
+        ];
+        next.sort((a, b) => a.createdAt - b.createdAt);
+        return next;
+      });
+    },
+    [channelId, noteEdit],
+  );
 
   useEffect(() => {
     setBase([]);
@@ -305,53 +365,89 @@ export function useMessages(channelId: string | null): {
         },
       ],
       {
-        onEvent: (event) => {
-          if (event.kind === KIND_EDIT) {
-            noteEdit(event);
-            return;
-          }
-          if (event.kind === KIND_DELETE) {
-            const target = event.tags.find((t) => t[0] === "e")?.[1];
-            if (target) {
-              setDeletions((prev) => {
-                const next = new Map(prev);
-                next.set(target, event.pubkey.toLowerCase());
-                return next;
-              });
-            }
-            return;
-          }
-          setBase((prev) => {
-            if (prev.some((m) => m.id === event.id && !m.pending)) {
-              return prev;
-            }
-            pendingIds.current.delete(event.id);
-            const next = [
-              ...prev.filter((m) => m.id !== event.id),
-              {
-                id: event.id,
-                channelId,
-                pubkey: event.pubkey,
-                content: event.content,
-                createdAt: event.created_at,
-                threadRoot: threadRootOf(event),
-                replyTo: replyTarget(event),
-                media: mediaOf(event),
-                mentions: mentionsOf(event),
-                emoji: emojiFromTags(event.tags),
-                carryTags: carryTagsOf(event),
-              },
-            ];
-            next.sort((a, b) => a.createdAt - b.createdAt);
-            return next;
-          });
-        },
+        onEvent: remember,
         onEose: () => setLoading(false),
         onClosed: () => setLoading(false),
       },
     );
     return unsubscribe;
-  }, [socket, channelId, noteEdit]);
+  }, [socket, channelId, remember]);
+
+  // Fetch linked history separately so opening a result does not reset the live timeline.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: explicit retry for a failed deep link.
+  useEffect(() => {
+    let cancelled = false;
+    setTargetError("");
+    setTargetLoading(Boolean(channelId && targetId));
+    if (!channelId || !targetId) return;
+    void (async () => {
+      try {
+        const found = await socket.queryOnce([
+          { kinds: [KIND_CHAT], ids: [targetId], "#h": [channelId], limit: 1 },
+        ]);
+        const target = found.find(
+          (event) =>
+            event.id === targetId &&
+            event.kind === KIND_CHAT &&
+            event.tags.some((tag) => tag[0] === "h" && tag[1] === channelId),
+        );
+        if (!target)
+          throw new Error(
+            "This message is unavailable. It may have been deleted or your access changed.",
+          );
+        const root = threadRootOf(target);
+        const context = await socket.queryOnce([
+          { kinds: [KIND_CHAT], ids: [root], "#h": [channelId], limit: 1 },
+          {
+            kinds: [KIND_CHAT],
+            "#e": [root],
+            "#h": [channelId],
+            limit: HISTORY_LIMIT,
+          },
+        ]);
+        const events = [
+          target,
+          ...context.filter((event) => event.kind === KIND_CHAT),
+        ];
+        const ids = [...new Set(events.map((event) => event.id))];
+        const overlays = await socket.queryOnce([
+          {
+            kinds: [KIND_EDIT, KIND_DELETE],
+            "#e": ids,
+            "#h": [channelId],
+            limit: 500,
+          },
+        ]);
+        if (cancelled) return;
+        const deleted = (event: NostrEvent) =>
+          overlays.some(
+            (overlay) =>
+              overlay.kind === KIND_DELETE &&
+              overlay.pubkey.toLowerCase() === event.pubkey.toLowerCase() &&
+              overlay.tags.some((tag) => tag[0] === "e" && tag[1] === event.id),
+          );
+        for (const event of [...events, ...overlays]) remember(event);
+        if (
+          deleted(target) ||
+          (root !== target.id &&
+            !events.some((event) => event.id === root && !deleted(event)))
+        )
+          throw new Error("This message or its thread is no longer available.");
+      } catch (cause) {
+        if (!cancelled)
+          setTargetError(
+            cause instanceof Error
+              ? cause.message
+              : "Could not load this message. Try again.",
+          );
+      } finally {
+        if (!cancelled) setTargetLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [socket, channelId, targetId, remember, targetRetry]);
 
   // The visible timeline: base events with edit and delete overlays applied.
   const messages = useMemo(() => {
@@ -501,5 +597,14 @@ export function useMessages(channelId: string | null): {
     [socket, channelId],
   );
 
-  return { messages, loading, send, editMessage, deleteMessage };
+  return {
+    messages,
+    loading,
+    send,
+    editMessage,
+    deleteMessage,
+    targetLoading,
+    targetError,
+    retryTarget: () => setTargetRetry((n) => n + 1),
+  };
 }

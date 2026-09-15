@@ -1,0 +1,11 @@
+{
+  admin off
+  auto_https off
+}
+https://localhost:3343 {
+  bind 127.0.0.1
+  tls /certs/server.crt /certs/server.key
+  reverse_proxy http://127.0.0.1:3300 {
+    header_up Host localhost:3300
+  }
+}

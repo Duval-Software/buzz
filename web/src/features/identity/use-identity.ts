@@ -1,3 +1,5 @@
+import { managedAccountsEnabled } from "@/shared/lib/supabase";
+import { signOutManagedAccount } from "./managed-accounts";
 /** Account sign-in and community admission are separate server decisions. */
 
 import { logoutAccount } from "@/features/identity/accounts";
@@ -92,7 +94,8 @@ export function useMembership(): {
   }, []);
 
   const signOut = useCallback(async (): Promise<void> => {
-    await logoutAccount();
+    if (managedAccountsEnabled) await signOutManagedAccount();
+    else await logoutAccount();
     getSocket(relayWsUrl()).close();
     resetProfiles();
     forgetIdentity();

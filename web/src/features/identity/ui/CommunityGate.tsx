@@ -1,3 +1,4 @@
+import { managedAccountsEnabled } from "@/shared/lib/supabase";
 import { Navigate, useLocation } from "@tanstack/react-router";
 import { needsOnboarding } from "@/features/onboarding/onboarding-state";
 import { type ReactNode, useState } from "react";
@@ -9,6 +10,7 @@ import { Welcome } from "@/features/identity/ui/Welcome";
 import { useMembership } from "@/features/identity/use-identity";
 import { getSocket } from "@/shared/lib/nostr-socket";
 import { relayWsUrl } from "@/shared/lib/relay-url";
+import { HiveLoading } from "@/shared/ui/HiveLoading";
 
 /** How many times to re-authenticate after joining before giving up. */
 const REAUTH_ATTEMPTS = 3;
@@ -67,16 +69,30 @@ export function CommunityGate({ children }: { children: ReactNode }) {
   }
 
   if (status === "checking" && !pending) {
+    return <HiveLoading message="Connecting to your community…" />;
+  }
+
+  if (managedAccountsEnabled)
     return (
       <main className="hive-app hive-entry">
-        <div className="hive-empty" role="status">
-          <h1>CreatorHive</h1>
-          <p>Connecting to your community…</p>
+        <div role="alert">
+          <h1>Could not enter the community</h1>
+          <p>Retry the connection, or sign in again.</p>
+          <a href="/account-moderation">
+            Review account restrictions or appeal
+          </a>
+          <button
+            type="button"
+            onClick={() => getSocket(relayWsUrl()).reconnect()}
+          >
+            Retry connection
+          </button>
+          <button type="button" onClick={() => void signOut()}>
+            Sign out
+          </button>
         </div>
       </main>
     );
-  }
-
   return (
     <Welcome
       hasIdentity={!!identity && !pending}

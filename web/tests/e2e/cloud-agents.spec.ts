@@ -119,6 +119,19 @@ for (const width of [1440, 390]) {
     ).not.toContain(key);
     expect(providerRequests).toHaveLength(0);
     expect(posts).toBe(2);
+    await page
+      .locator(".hive-list-row")
+      .filter({ hasText: "Studio helper" })
+      .getByRole("button", { name: "Message", exact: true })
+      .click();
+    await expect(page).toHaveURL(/\/chat\?channel=dm$/);
+    expect(
+      fixture.published.some(
+        (event) =>
+          event.kind === 41010 &&
+          event.tags.some((tag) => tag[0] === "p" && tag[1] === agent.pubkey),
+      ),
+    ).toBe(true);
   });
 }
 

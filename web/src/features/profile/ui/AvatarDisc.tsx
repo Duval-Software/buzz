@@ -1,15 +1,8 @@
-/**
- * A small identicon: first letter of the name on a hue derived from the
- * pubkey.
- *
- * Deliberately NOT the profile's picture URL. Profile pictures are arbitrary
- * external URLs, and rendering them would make every reader's browser call
- * out to whatever host the author chose — an IP beacon in a chat timeline.
- * The desktop app runs a whole avatar verification pipeline before showing
- * one; until the web app has an equivalent, a deterministic disc is honest
- * and leaks nothing.
- */
+import { useProfile } from "../use-profiles";
+import { isRelayMediaUrl } from "@/features/chat/message-media";
+import { useAuthedMediaUrl } from "@/features/chat/media-auth";
 
+/** Show only authenticated relay photos; arbitrary profile URLs never become tracking pixels. */
 export function AvatarDisc({
   pubkey,
   name,
@@ -19,6 +12,8 @@ export function AvatarDisc({
   name: string;
   size?: number;
 }) {
+  const profile = useProfile(pubkey);
+  const picture = profile?.raw.picture;
   // Stable hue from the key so a person keeps their color across sessions
   // and screens. First 6 hex chars are plenty of entropy for a hue wheel.
   const hue = Number.parseInt(pubkey.slice(0, 6) || "0", 16) % 360;
@@ -26,7 +21,7 @@ export function AvatarDisc({
   return (
     <span
       aria-hidden="true"
-      className="inline-flex shrink-0 select-none items-center justify-center rounded-xl font-semibold"
+      className="inline-flex shrink-0 select-none items-center justify-center rounded-xl font-semibold overflow-hidden"
       style={{
         width: `${size / 16}rem`,
         height: `${size / 16}rem`,
@@ -35,7 +30,25 @@ export function AvatarDisc({
         color: `hsl(${hue} 38% 82%)`,
       }}
     >
-      {letter}
+      {typeof picture === "string" && isRelayMediaUrl(picture) ? (
+        <RelayAvatar url={picture} fallback={letter} />
+      ) : (
+        letter
+      )}
     </span>
+  );
+}
+
+function RelayAvatar({ url, fallback }: { url: string; fallback: string }) {
+  const { src, failed, onError } = useAuthedMediaUrl(url);
+  return src && !failed ? (
+    <img
+      src={src}
+      alt=""
+      onError={onError}
+      className="w-full h-full object-cover"
+    />
+  ) : (
+    fallback
   );
 }

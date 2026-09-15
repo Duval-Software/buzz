@@ -2,9 +2,13 @@ import { index, route, rootRoute } from "@tanstack/virtual-file-routes";
 
 export const routes = rootRoute("root.tsx", [
   index("index.tsx"),
+  route("/$profileHandle", "profile.tsx"),
+  route("/profile/edit", "profile-edit.tsx"),
   route("/chat", "chat.tsx"),
   route("/onboarding", "onboarding.tsx"),
   route("/pulse", "pulse.tsx"),
+  route("/manage", "manage.tsx"),
+  route("/account-moderation", "account-moderation.tsx"),
   route("/live", "live.tsx"),
   route("/inbox", "inbox.tsx"),
   route("/workflows", "workflows.tsx"),

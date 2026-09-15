@@ -32,6 +32,7 @@ Thumbs.db
 .scratch/
 
 # Playwright artifacts
+web/dist-cloudflare/
 playwright-report/
 test-results/
 blob-report/

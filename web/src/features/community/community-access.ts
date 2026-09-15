@@ -6,7 +6,7 @@ import { getSocket } from "@/shared/lib/nostr-socket";
 import { signNostrEvent } from "@/shared/lib/nostr-signer";
 import { relayHttpBaseUrl, relayWsUrl } from "@/shared/lib/relay-url";
 
-export type CommunityRole = "owner" | "admin" | "member";
+export type CommunityRole = "owner" | "admin" | "moderator" | "member";
 export type CommunityMember = { pubkey: string; role: CommunityRole };
 export const POSTING_POLICY_EXTENSION = "buzz-channel-posting-policy-v1";
 
@@ -73,7 +73,10 @@ export function useCommunityMembers() {
         const role = tag[0] === "member" ? tag[2] : tag[3];
         if (
           /^[0-9a-f]{64}$/.test(pubkey ?? "") &&
-          (role === "owner" || role === "admin" || role === "member")
+          (role === "owner" ||
+            role === "admin" ||
+            role === "moderator" ||
+            role === "member")
         )
           members.set(pubkey, { pubkey, role });
       }
@@ -87,7 +90,18 @@ export function useCommunityMembers() {
 
 /** Publish using the existing signed command and await the relay's actual verdict. */
 export async function publishCommunityCommand(
-  kind: 9002 | 9030 | 9031 | 9032,
+  kind:
+    | 9002
+    | 9030
+    | 9031
+    | 9032
+    | 9040
+    | 9041
+    | 9042
+    | 9043
+    | 9044
+    | 9045
+    | 9046,
   tags: string[][],
 ) {
   const event = await signNostrEvent({

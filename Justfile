@@ -92,7 +92,11 @@ build-release:
     cargo build --workspace --release
 
 # Run repo lint and formatting checks
-check: fmt-check clippy desktop-check desktop-tauri-fmt-check desktop-tauri-clippy web-check mobile-check
+check: moderation-check fmt-check clippy desktop-check desktop-tauri-fmt-check desktop-tauri-clippy web-check mobile-check
+
+# Validate the reviewed word file before any release checks run.
+moderation-check:
+    python3 moderation/test-policy.py
 
 # Format all Rust code
 fmt:

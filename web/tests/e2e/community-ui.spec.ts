@@ -84,9 +84,7 @@ for (const viewport of [
     await page.keyboard.press("Escape");
     if (viewport.width === 390)
       await page.getByRole("button", { name: "Channels", exact: true }).click();
-    await page
-      .getByRole("button", { name: "Your profile", exact: false })
-      .click();
+    await page.getByRole("button", { name: "Account", exact: false }).click();
     const dialog = page.getByRole("dialog", { name: "Your account" });
     await expect(dialog).toBeVisible();
     await expect(
@@ -203,7 +201,7 @@ test("every member page inherits the same shell and theme", async ({
           .getByRole("link", { name: "Workflows", exact: true })
           .click();
       } else if (route === "community") {
-        await page.getByRole("button", { name: /Your profile/ }).click();
+        await page.getByRole("button", { name: /^Account/ }).click();
         await page
           .getByRole("link", { name: "Community settings", exact: true })
           .click();
@@ -413,7 +411,7 @@ for (const [role, policy] of [
           "Announcements · Only channel owners and admins can publish. You can read and react here.",
           { exact: true },
         ),
-      ).toBeVisible();
+      ).toHaveCount(0);
     } else
       await expect(
         page.getByRole("textbox", { name: "Message #announcements" }),
@@ -720,18 +718,12 @@ test("sidebar preferences, search, disclosures and studio state", async ({
     section.getByRole("button", { name: "# markdown", exact: true }),
   ).not.toBeVisible();
   await page.keyboard.press("Enter");
-  await page.getByRole("button", { name: "Browse channels" }).click();
-  const browser = page.getByRole("dialog", { name: "Browse channels" });
-  await browser.getByLabel("Filter channels").fill("missing");
-  await expect(browser.getByText("No channels found.")).toBeVisible();
-  await browser.getByLabel("Filter channels").fill("mark");
-  await browser.getByRole("button", { name: "Pin markdown" }).click();
   await expect(
-    browser.getByRole("button", { name: "Pin markdown" }),
-  ).toHaveAttribute("aria-pressed", "true");
-  await page.keyboard.press("Escape");
-  await page.reload();
-  await expect(sidebar.locator(".hive-channel-pin")).toHaveCount(1);
+    sidebar.getByRole("button", { name: "Browse channels" }),
+  ).toHaveCount(0);
+  await expect(
+    section.getByRole("button", { name: "# markdown", exact: true }),
+  ).toBeVisible();
   await page.getByRole("link", { name: "Live studio", exact: true }).click();
   await page.getByRole("link", { name: "CreatorHive home" }).click();
   await expect(page).toHaveURL(/channel=markdown/);

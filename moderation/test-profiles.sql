@@ -1,0 +1,36 @@
+\set ON_ERROR_STOP on
+BEGIN;
+SET search_path=buzz,extensions;
+INSERT INTO auth.users(id,email_confirmed_at,is_anonymous,deleted_at) VALUES('00000000-0000-0000-0000-000000000032',now(),false,NULL);
+INSERT INTO auth.sessions(id,user_id) VALUES('00000000-0000-0000-0000-000000000033','00000000-0000-0000-0000-000000000032');
+INSERT INTO communities(id,host) VALUES('00000000-0000-0000-0000-000000000034','profile-tests.invalid');
+INSERT INTO managed_accounts VALUES('00000000-0000-0000-0000-000000000034','00000000-0000-0000-0000-000000000032',repeat('d',64),1,decode(repeat('0',120),'hex'),now());
+INSERT INTO relay_members(community_id,pubkey,role) VALUES('00000000-0000-0000-0000-000000000034',repeat('d',64),'member'),('00000000-0000-0000-0000-000000000034',repeat('a',64),'admin');
+INSERT INTO moderation_word_policy VALUES('00000000-0000-0000-0000-000000000034','test',ARRAY['testblocked'],now());
+SELECT set_config('request.jwt.claims',jsonb_build_object('role','authenticated','sub','00000000-0000-0000-0000-000000000032','session_id','00000000-0000-0000-0000-000000000033','exp',extract(epoch from now()+interval '1 hour')::bigint)::text,true);
+SET LOCAL ROLE authenticated;
+SELECT public.creatorhive_profile('save','newmember','{"display_name":"New Member","interests":[],"working_on":""}');
+DO $$ DECLARE denied BOOLEAN; BEGIN
+ denied:=false;BEGIN PERFORM public.creatorhive_profile('save','testblocked','{"display_name":"Good Name","interests":[]}');EXCEPTION WHEN SQLSTATE '22023' THEN denied:=true;END;ASSERT denied,'direct profile RPC enforces word policy';
+ denied:=false;BEGIN PERFORM public.creatorhive_profile('save','newmember','{"display_name":"testblocked","interests":[]}');EXCEPTION WHEN SQLSTATE '22023' THEN denied:=true;END;ASSERT denied,'display name filter';
+ denied:=false;BEGIN PERFORM 1 FROM buzz.moderation_appeals;EXCEPTION WHEN insufficient_privilege THEN denied:=true;END;ASSERT denied,'private appeals cannot be read through authenticated role';
+END $$;
+RESET ROLE;
+SELECT moderation_staff_command('00000000-0000-0000-0000-000000000034',decode(repeat('a',64),'hex'),decode(repeat('1',64),'hex'),9045,jsonb_build_object('p',repeat('d',64),'username','newmember','reason','Impersonation report reviewed'));
+SET LOCAL ROLE buzz_relay;
+DO $$ BEGIN ASSERT (SELECT count(*) FROM buzz.moderation_rename_holds WHERE community_id='00000000-0000-0000-0000-000000000034')=1,'runtime RLS permits enforcement'; ASSERT (SELECT count(*) FROM buzz.moderation_word_policy WHERE community_id='00000000-0000-0000-0000-000000000034')=1,'runtime RLS permits filtering'; END $$;
+RESET ROLE;
+SET LOCAL ROLE authenticated;
+DO $$ BEGIN ASSERT public.creatorhive_profile('check','newmember')->>'available'='false','held username unavailable'; END $$;
+SELECT public.creatorhive_profile('save','compliant','{"display_name":"Good Name","interests":[]}');
+RESET ROLE;
+DO $$ BEGIN ASSERT NOT EXISTS(SELECT 1 FROM moderation_rename_holds WHERE required),'rename clears restriction'; ASSERT EXISTS(SELECT 1 FROM moderation_rename_holds WHERE username='newmember'),'disputed handle remains held'; END $$;
+DELETE FROM managed_accounts WHERE account_id='00000000-0000-0000-0000-000000000032';
+SET LOCAL ROLE authenticated;
+DO $$ DECLARE denied BOOLEAN:=false; BEGIN BEGIN PERFORM public.creatorhive_profile('save','testblocked','{"display_name":"Good Name","interests":[]}'); EXCEPTION WHEN insufficient_privilege THEN denied:=true; END; ASSERT denied,'unprovisioned accounts cannot bypass community policy'; END $$;
+RESET ROLE;
+UPDATE auth.sessions SET not_after=now()-interval '1 minute' WHERE id='00000000-0000-0000-0000-000000000033';
+SET LOCAL ROLE authenticated;
+DO $$ DECLARE denied BOOLEAN:=false; BEGIN BEGIN PERFORM public.creatorhive_profile('get'); EXCEPTION WHEN insufficient_privilege THEN denied:=true; END; ASSERT denied,'revoked session cannot save or read profile'; END $$;
+RESET ROLE;
+ROLLBACK;

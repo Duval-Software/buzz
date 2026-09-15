@@ -1,8 +1,39 @@
 # CreatorHive accounts
 
-Members use a username and password to create an account, sign in on another device, and change their password. Existing members create a login in **Your account**; the messaging identity, history, community membership and roles are retained. Administrators resolve registered usernames when granting access. Account creation itself never grants community admission or a role.
+Legacy Buzz deployments use a username and password to create an account, sign in on another device, and change their password. Existing members create a login in **Your account**; the messaging identity, history, community membership and roles are retained. Administrators resolve registered usernames when granting access. Account creation itself never grants community admission or a role.
 
-## Implemented locally
+## Managed CreatorHive login
+
+Managed mode supports Google through Supabase PKCE and email/password. The supplied split-screen
+component is adapted in `web/src/shared/ui/sign-in.tsx`, alongside the existing UI
+components; no new shadcn structure, packages, or fonts are needed. The mascot and
+wordmark are centered above the email/password form, account creation and recovery links,
+and Google alternative. Keep Supabase's Google and Email providers enabled.
+Email is the sign-in identifier; this does not reuse legacy Buzz usernames.
+Legacy Buzz deployments remain separate behind `VITE_MANAGED_ACCOUNTS=false`.
+
+Validation September 15: web checks/typecheck and production build passed; all six
+onboarding tests and six managed-account tests passed (the unrelated SSO test remains
+skipped). Desktop/mobile rendering was reviewed, keyboard button focus and reduced motion
+checked, and the live localhost button reached Google's account chooser and returned
+successfully. This verifies the handoff, not a new completed account login. Supabase's
+public settings confirm both Google and Email enabled. Email rejection, registration
+and recovery transport are covered with mocked Auth responses; this UI check does not
+create a real user or change an existing password. These UI changes are local and have not been published to production.
+
+The workshop artwork is `web/public/creatorhive-workshop.png`, generated with the
+built-in image tool (no selectable model ID was exposed). The original mascot stays
+`web/public/creatorhive-logo.png`. Login uses the supplied inset image layout; onboarding
+shares the artwork. Mobile login follows the supplied form-only layout. Both respect
+reduced motion and retain native keyboard controls.
+
+<details><summary>Image generation prompt</summary>
+
+Use case: stylized-concept. Asset: real CreatorHive web application login background artwork, not a screenshot or UI mockup. Create a premium cinematic 3D illustration of a miniature creative workshop suspended in darkness: an architectural honeycomb of warm amber glass and softly illuminated golden hexagonal chambers, a few tactile workbenches and screens, tiny abstract maker silhouettes collaboratively building, restrained sage/teal accents, beautiful physical materials, subtle atmospheric grain. Strong sculptural honeycomb form occupying center-right, with dark charcoal negative space at left and top. Sophisticated Apple product-film lighting, community workshop spirit, inviting and quiet rather than cyberpunk. Wide landscape composition, full bleed, crisp art direction. No text, letters, words, logos, UI controls, watermarks, badges, or fake interface. This artwork will sit behind real accessible HTML and the original CreatorHive logo.
+
+</details>
+
+## Legacy accounts implemented locally
 
 - `0030_community_accounts.sql`: community-scoped, case-insensitive unique usernames, unique identity linkage, Argon2id password verifiers, encrypted backups, durable attempt quotas and hashed device sessions. No existing identity, membership or message rows are rewritten.
 - HTTP-only `/api/accounts/register`, `/login`, `/password`, `/logout`, `/resolve`. Passwords are never Nostr events. Registration and password changes require signed ownership proof covering the entire body. Password changes additionally require the current password. The lookup endpoint requires an existing community owner/admin.
@@ -43,10 +74,16 @@ Crypto references: [OWASP password storage](https://cheatsheetseries.owasp.org/c
 
 ## Community welcome
 
-`/onboarding` is a member-gated, optional three-step flow: meet the Hive, choose a display name, then open Chat, Live, or Pulse. New account registration marks the welcome as pending; the ordinary community gate redirects only after the relay accepts membership. Invitation signup preserves its consent/claim flow before entering onboarding. Existing members can reopen it from **Your account → Revisit the community welcome**.
+The presentation now adapts [Cult UI's Onboarding primitives](https://github.com/nolly-studio/cult-ui/blob/main/apps/www/registry/default/ui/onboarding.tsx) in `web/src/shared/ui/onboarding.tsx` (MIT notice retained). It uses the supplied centered panel, header, step indicator and navigation composition, with a controlled three-step profile/username/interests flow after authentication. Native checkbox tiles preserve multiple interests rather than changing them into the reference's single-select radio group. The page uses CreatorHive’s inherited sans-serif typography, charcoal surfaces, a workshop detail within the panel header, gold accents and a framed avatar picker. The username has its own claim screen, separate from the photo/display-name fields. The surrounding scene is restrained so the form stays prominent. Step transitions honor reduced motion. No new dependency, feature-tour carousel, extra account step or database migration is introduced by this presentation change.
 
-Only **Save & open** publishes a profile update, through the existing signed kind:0 path, and navigation waits for the relay's acceptance. The shared profile helper reads the current profile first, preserves its other fields, validates the name and signer, and refuses to overwrite after an interrupted read. The welcome does not post an introduction, join channels, change roles, or charge a membership. Skip exits without publishing a profile.
+Account creation comes first (Google, or verified email/password). `/onboarding` then asks for a profile, a separate username claim, and optional interests. Managed members choose a unique lowercase @username, display name and optional photo. Usernames are community handles, not login credentials; Google members never need another password. Existing members can edit these choices through **Your account → Revisit the community welcome**.
 
-The pending/completed marker is local to the browser and keyed by relay URL plus member public key. Unfinished onboarding reappears after login in that browser; individual step drafts stay in memory. Progress is not synced across devices. When browser storage is unavailable, an in-memory fallback keeps Skip usable for the current page session. This is navigation state only, never an access or subscription entitlement.
+`deploy/supabase/member_profiles.sql` stores canonical handles, names and private preferences in `buzz.member_profiles`. The narrowly scoped `public.creatorhive_profile` RPC reads only the caller's record, checks availability, and saves it. A database unique constraint handles concurrent claims; client availability checks are advisory. The RPC checks verified, unrevoked first-party sessions and rejects OAuth client tokens. Browser roles have no direct table access. Apply it after `auth_integration.sql`; the SQL regression script uses temporary accounts inside a rolled-back transaction.
 
-Verified all three steps at 1440, 768, and 390 pixels, keyboard focus and radio selection, name validation, previous-field preservation, failure/skip behavior, membership denial, interrupted profile reads, and pending-state reload with blocked storage. Tests use synthetic relay traffic; no real profiles or roles were changed. Restart an existing Vite server when adding virtual routes, so its cached route configuration does not overwrite the newly generated route tree.
+**Claim username** immediately saves the canonical handle through the existing profile RPC. Availability is advisory, not a reservation; only an accepted save displays the success pulse/checkmark and unlocks Continue. The claim survives leaving onboarding and is loaded on return. Changing to another handle releases the previous name through the same atomic update. The UI makes no unverified rarity claims, has no countdown or sound, and honors reduced motion.
+
+**Enter the Hive** saves the remaining private profile preferences, uploads a selected photo through the existing authenticated media path, publishes name/photo through the existing kind:0 profile helper, and records completion in Supabase user metadata. Existing profile fields are preserved. An interrupted read refuses an overwrite. Failed steps retain the form for retry; an uploaded photo is reused if only completion fails. JPG, PNG and WebP uploads are limited to 5 MB here. Google photos are imported only on an explicit click and copied into CreatorHive media storage; arbitrary external profile images are not rendered.
+
+Interests and “What are you working on?” are optional and never posted to chat. Completing the flow opens accessible General (or another accessible public channel) with a private, dismissible welcome suggesting accessible channels and Live/Pulse. It does not post an introduction, join channels, change roles or grant paid access. The welcome banner is tab-local; canonical preferences survive browsers. The completion metadata controls navigation only, never permissions.
+
+Legacy deployments retain the name/photo path without claiming username uniqueness; they do not persist interests to Supabase. Managed deployments require the profile migration before releasing this frontend. Browser tests cover both modes, keyboard operation, responsive layout, invalid/taken usernames, photo import, save retries, private preferences and denied membership. The separate SQL check covers ownership, duplicate handles and session revocation.

@@ -1,5 +1,8 @@
+import { managedAccountsEnabled } from "./supabase";
+import { managedRequest } from "@/features/identity/managed-accounts";
 import {
   finalizeEvent,
+  verifyEvent,
   generateSecretKey,
   getPublicKey,
 } from "nostr-tools/pure";
@@ -80,6 +83,28 @@ export async function signNostrEvent(
   };
   // An explicitly signed-in account wins over an unrelated extension identity.
   const account = loadIdentity();
+  if (managedAccountsEnabled) {
+    if (!account?.managed) throw new Error("Please sign in to continue.");
+    const signed = await managedRequest("sign", {
+      request_id: crypto.randomUUID(),
+      session_token: account.sessionToken,
+      event: unsigned,
+    });
+    const expected = {
+      ...unsigned,
+      tags: [22242, 27235, 24242].includes(unsigned.kind)
+        ? [...unsigned.tags, ["account-session", account.sessionToken]]
+        : unsigned.tags,
+    };
+    if (
+      !signed ||
+      signed.pubkey !== account.pubkey ||
+      !sameUnsignedEvent(expected, signed) ||
+      !verifyEvent(signed)
+    )
+      throw new Error("The account service returned an invalid response.");
+    return signed;
+  }
   if (account?.username) {
     if (
       account.sessionToken &&
@@ -114,7 +139,7 @@ export async function signNostrEvent(
   // `requireNip07` exists to protect: a membership row created with it can
   // still be used by the same person tomorrow.
   const stored = loadIdentity();
-  if (stored) {
+  if (stored && !stored.managed) {
     const signed = finalizeEvent(unsigned, stored.secretKey);
     if (signed.pubkey !== stored.pubkey) {
       throw new Error("The stored browser identity failed to sign.");

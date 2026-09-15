@@ -1,4 +1,4 @@
-import { Inbox, AtSign } from "lucide-react";
+import { Inbox, AtSign, LoaderCircle } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { contentWithoutMediaLines } from "@/features/chat/message-media";
@@ -140,11 +140,14 @@ export function InboxPage() {
 
   function openItem(item: InboxItem) {
     if (item.kind === 1) {
-      void navigate({ to: "/pulse" });
+      void navigate({ to: "/pulse", search: { update: item.id } });
       return;
     }
     if (item.channelId) {
-      void navigate({ to: "/chat", search: { channel: item.channelId } });
+      void navigate({
+        to: "/chat",
+        search: { channel: item.channelId, event: item.id },
+      });
     }
   }
 
@@ -196,21 +199,21 @@ export function InboxPage() {
         <section aria-label="Mentions and messages">
           <div className="hive-section-heading">
             <AtSign size={19} aria-hidden="true" />
-            <div>
-              <h2>Mentions &amp; messages</h2>
-              <p>Your conversations, gathered in one place.</p>
-            </div>
+            <h2>Mentions &amp; messages</h2>
           </div>
           {loading && items.length === 0 ? (
-            <p className="px-4 py-6 text-neutral-500 text-sm">checking…</p>
+            <div className="hive-empty" role="status">
+              <LoaderCircle
+                className="motion-safe:animate-spin"
+                aria-hidden="true"
+              />
+              <p>Loading messages…</p>
+            </div>
           ) : items.length === 0 ? (
             <div className="hive-empty">
               <Inbox aria-hidden="true" />
-              <h3>A little breathing room.</h3>
-              <p>
-                When someone mentions you or sends a direct message, you’ll find
-                it here.
-              </p>
+              <h3>You’re all caught up</h3>
+              <p>Mentions and direct messages will appear here.</p>
             </div>
           ) : (
             items.map((item) => (

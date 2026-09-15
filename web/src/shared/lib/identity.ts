@@ -1,18 +1,46 @@
 /** Identity used by the messaging protocol. Credential accounts unlock it in memory.
  * Legacy browser identities remain available until their owner creates a login. */
 
+import { managedAccountsEnabled } from "./supabase";
 import { nip19 } from "nostr-tools";
 import { generateSecretKey, getPublicKey } from "nostr-tools/pure";
 
 const STORAGE_KEY = "buzz.identity.nsec";
 
-export type StoredIdentity = {
+type LocalIdentity = {
+  managed?: false;
   secretKey: Uint8Array;
   pubkey: string;
   npub: string;
   username?: string;
   sessionToken?: string;
 };
+
+export type ManagedIdentity = {
+  managed: true;
+  accountId: string;
+  pubkey: string;
+  npub: string;
+  sessionToken: string;
+  expiresAt: number;
+  email?: string;
+  username?: never;
+  secretKey?: never;
+};
+export type StoredIdentity = LocalIdentity | ManagedIdentity;
+
+export function setManagedIdentity(
+  account: Omit<ManagedIdentity, "managed" | "npub" | "email">,
+  email?: string,
+) {
+  localStorage.removeItem(STORAGE_KEY);
+  publish({
+    ...account,
+    managed: true,
+    npub: nip19.npubEncode(account.pubkey),
+    email,
+  });
+}
 
 /**
  * The current identity, cached.
@@ -33,13 +61,13 @@ function decode(nsec: string): Uint8Array | null {
   }
 }
 
-function toIdentity(secretKey: Uint8Array): StoredIdentity {
+function toIdentity(secretKey: Uint8Array): LocalIdentity {
   const pubkey = getPublicKey(secretKey);
   return { secretKey, pubkey, npub: nip19.npubEncode(pubkey) };
 }
 
 function readFromStorage(): StoredIdentity | null {
-  if (typeof localStorage === "undefined") {
+  if (managedAccountsEnabled || typeof localStorage === "undefined") {
     return null;
   }
   const stored = localStorage.getItem(STORAGE_KEY);
@@ -91,7 +119,8 @@ if (typeof window !== "undefined") {
 }
 
 /** Create and persist a new identity, replacing any existing one. */
-export function createIdentity(): StoredIdentity {
+export function createIdentity(): LocalIdentity {
+  if (managedAccountsEnabled) throw new Error("Please sign in to CreatorHive.");
   const secretKey = generateSecretKey();
   localStorage.setItem(STORAGE_KEY, nip19.nsecEncode(secretKey));
   const identity = toIdentity(secretKey);
@@ -105,7 +134,8 @@ export function loadOrCreateIdentity(): StoredIdentity {
 }
 
 /** Adopt an identity the user already owns, from its `nsec`. */
-export function importIdentity(nsec: string): StoredIdentity | null {
+export function importIdentity(nsec: string): LocalIdentity | null {
+  if (managedAccountsEnabled) throw new Error("Please sign in to CreatorHive.");
   const secretKey = decode(nsec.trim());
   if (!secretKey) {
     return null;
@@ -118,7 +148,7 @@ export function importIdentity(nsec: string): StoredIdentity | null {
 
 /** The backup string to show a user who asks to save their identity. */
 export function exportIdentity(): string | null {
-  return typeof localStorage === "undefined"
+  return managedAccountsEnabled || typeof localStorage === "undefined"
     ? null
     : localStorage.getItem(STORAGE_KEY);
 }
@@ -128,7 +158,8 @@ export function unlockAccount(
   secretKey: Uint8Array,
   username: string,
   sessionToken: string,
-): StoredIdentity {
+): LocalIdentity {
+  if (managedAccountsEnabled) throw new Error("Please sign in to CreatorHive.");
   const identity = { ...toIdentity(secretKey), username, sessionToken };
   // Remove a migrated legacy secret only after the server has saved the account.
   localStorage.removeItem(STORAGE_KEY);

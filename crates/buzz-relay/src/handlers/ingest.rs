@@ -299,6 +299,19 @@ pub enum IngestError {
     Internal(String),
 }
 
+fn map_event_store_error(error: buzz_db::DbError) -> IngestError {
+    if let buzz_db::DbError::Sqlx(sqlx::Error::Database(ref database)) = error {
+        if database.code().as_deref() == Some("22023")
+            && database
+                .message()
+                .starts_with("This text contains language blocked by the community.")
+        {
+            return IngestError::Rejected(format!("restricted: {}", database.message()));
+        }
+    }
+    IngestError::Internal(format!("error: database error: {error}"))
+}
+
 fn map_relay_admin_error(error: super::relay_admin::RelayAdminError) -> IngestError {
     use super::relay_admin::RelayAdminError;
     match error {
@@ -509,6 +522,9 @@ pub(crate) async fn derive_reaction_channel(
 /// limitation affecting all global-only kinds and should be addressed in the
 /// filter layer as a follow-up.
 pub(crate) fn is_global_only_kind(kind: u32) -> bool {
+    if buzz_core::kind::is_moderation_command_kind(kind) {
+        return true;
+    }
     matches!(
         kind,
         KIND_PROFILE
@@ -972,7 +988,7 @@ pub(crate) async fn check_channel_publishing(
 
 /// Validate kind:40003 edit ownership — event.pubkey must match target's effective author,
 /// or the actor must be the owning human of the agent that authored the target message.
-async fn validate_edit_ownership(
+pub(crate) async fn validate_edit_ownership(
     community_id: CommunityId,
     event: &Event,
     state: &AppState,
@@ -2127,6 +2143,17 @@ async fn ingest_event_inner(
         });
     }
 
+    if state
+        .db
+        .staff_rename_required(tenant.community(), auth.pubkey().as_bytes())
+        .await
+        .map_err(|_| IngestError::Rejected("error: Account restrictions unavailable".into()))?
+    {
+        return Err(IngestError::Rejected(
+            "restricted: Choose a new username in account restrictions.".into(),
+        ));
+    }
+
     // NIP-56 reports are persisted only to the mod queue. They are not stored in
     // the public events table and never fan out to subscribers. Reports remain
     // available while timed out so users can signal abuse during a write-block.
@@ -2972,7 +2999,7 @@ async fn ingest_event_inner(
             .db
             .replace_addressable_event(tenant.community(), &event, channel_id)
             .await
-            .map_err(|e| IngestError::Internal(format!("error: {e}")))?
+            .map_err(map_event_store_error)?
     } else if is_parameterized_replaceable(kind_u32) {
         // NIP-33 parameterized replaceable — keyed by (kind, pubkey, d_tag).
         let d_tag = buzz_db::event::extract_d_tag(&event).unwrap_or_default();
@@ -2987,7 +3014,7 @@ async fn ingest_event_inner(
             .db
             .replace_parameterized_event(tenant.community(), &event, &d_tag, channel_id)
             .await
-            .map_err(|e| IngestError::Internal(format!("error: {e}")))?
+            .map_err(map_event_store_error)?
     } else {
         let thread_params = thread_meta.as_ref().map(|m| m.as_params());
         match state
@@ -3018,7 +3045,7 @@ async fn ingest_event_inner(
                     buzz_db::DbError::AuthEventRejected => {
                         IngestError::Rejected("invalid: AUTH events cannot be stored".into())
                     }
-                    other => IngestError::Internal(format!("error: database error: {other}")),
+                    other => map_event_store_error(other),
                 });
             }
         }
@@ -3114,6 +3141,35 @@ async fn ingest_event_inner(
 
 #[cfg(test)]
 mod tests {
+    #[tokio::test]
+    #[ignore = "requires a disposable PostgreSQL database with migration 0032"]
+    async fn moderation_policy_returns_client_rejection() {
+        let pool = sqlx::postgres::PgPoolOptions::new()
+            .max_connections(1)
+            .connect(&std::env::var("TEST_DATABASE_URL").expect("disposable test database"))
+            .await
+            .expect("connect test database");
+        let mut tx = pool.begin().await.expect("begin fixture");
+        let community = uuid::Uuid::new_v4();
+        sqlx::query("INSERT INTO communities(id,host) VALUES($1,$2)")
+            .bind(community)
+            .bind(format!("{community}.policy-test.invalid"))
+            .execute(&mut *tx)
+            .await
+            .expect("community fixture");
+        sqlx::query("INSERT INTO moderation_word_policy(community_id,revision,terms) VALUES($1,'test',ARRAY['testblocked'])")
+            .bind(community).execute(&mut *tx).await.expect("policy fixture");
+        let error = sqlx::query("SELECT moderation_check_text($1,'TESTBLOCKED')")
+            .bind(community)
+            .execute(&mut *tx)
+            .await
+            .expect_err("blocked text");
+        assert!(
+            matches!(super::map_event_store_error(error.into()), super::IngestError::Rejected(message) if message.contains("Please edit it and try again."))
+        );
+        tx.rollback().await.expect("remove fixture");
+    }
+
     use std::sync::Mutex;
 
     use super::*;

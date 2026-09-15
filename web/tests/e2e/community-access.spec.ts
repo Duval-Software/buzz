@@ -30,12 +30,20 @@ test("community owner reviews signed changes and receives actual relay errors", 
   expect(fixture.published.filter((event) => event.kind === 9032)).toHaveLength(
     0,
   );
+  await expect(
+    page.getByRole("button", { name: "Confirm change" }),
+  ).toBeDisabled();
+  await page
+    .getByLabel("Reason", { exact: true })
+    .fill("Appoint approved administrator");
   await page.getByRole("button", { name: "Confirm change" }).click();
   await expect(page.getByRole("alert")).toContainText("fixture denied");
   const command = fixture.published.find((event) => event.kind === 9032);
   expect(command?.tags).toEqual([
     ["p", fixture.builder],
     ["role", "admin"],
+    ["reason", "Appoint approved administrator"],
+    ["expected", "member"],
   ]);
   expect(verifyEvent(command as Parameters<typeof verifyEvent>[0])).toBe(true);
   await page.keyboard.press("Escape");
@@ -43,7 +51,7 @@ test("community owner reviews signed changes and receives actual relay errors", 
   await page
     .getByRole("link", { name: "CreatorHive home", exact: true })
     .click();
-  await page.getByRole("button", { name: /Your profile/ }).click();
+  await page.getByRole("button", { name: /^Account/ }).click();
   await page
     .getByRole("link", { name: "Community settings", exact: true })
     .click();
@@ -123,7 +131,7 @@ test("announcement readers retain history and reactions without composers", asyn
   await page.goto("/chat?channel=markdown");
   await expect(page.getByText("Announcement fixture")).toBeVisible();
   await expect(
-    page.getByText("Announcements · Only channel owners"),
+    page.getByRole("heading", { name: "Announcement channel #markdown" }),
   ).toBeVisible();
   await expect(page.getByPlaceholder("Message #markdown")).toHaveCount(0);
   await page.getByRole("button", { name: /1 reply/ }).click();

@@ -1,0 +1,32 @@
+# Optional local-SSH rehearsal overlay. It exposes no public listener.
+services:
+  preview-session:
+    image: caddy:2
+    network_mode: host
+    volumes:
+      - ./preview-keeper.Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./integration-tls:/certs:ro
+    read_only: true
+    tmpfs: [/data, /config]
+    cap_drop: [ALL]
+    # The official Caddy binary carries this file capability and needs it at exec.
+    cap_add: [NET_BIND_SERVICE]
+    security_opt: [no-new-privileges:true]
+    cpus: 0.25
+    mem_limit: 128m
+  agentkeeper:
+    image: ${BUZZ_IMAGE:?set existing preview runtime image}
+    entrypoint: /usr/local/bin/agentkeeper
+    network_mode: host
+    user: "1000:1000"
+    env_file: [agentkeeper.env]
+    volumes:
+      - ./agentkeeper-linux-amd64:/usr/local/bin/agentkeeper:ro
+      - ./keeper-data:/var/lib/agentkeeper
+      - ./certs:/opt/creatorhive-preview/certs:ro
+      - ./integration-tls/ca.crt:/opt/creatorhive-preview/keeper-ca.crt:ro
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    cpus: 0.5
+    mem_limit: 256m

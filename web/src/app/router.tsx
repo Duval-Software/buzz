@@ -1,6 +1,7 @@
 import { createBrowserHistory, createRouter } from "@tanstack/react-router";
 
 import { routeTree } from "@/app/routeTree.gen";
+import { HiveLoading } from "@/shared/ui/HiveLoading";
 
 export const router = createRouter({
   routeTree,
@@ -8,11 +9,7 @@ export const router = createRouter({
   scrollRestoration: true,
   defaultPendingMs: 150,
   defaultPendingMinMs: 150,
-  defaultPendingComponent: () => (
-    <div className="hive-app hive-entry">
-      <p role="status">Loading CreatorHive…</p>
-    </div>
-  ),
+  defaultPendingComponent: HiveLoading,
   defaultErrorComponent: () => (
     <div className="hive-app hive-entry">
       <div>

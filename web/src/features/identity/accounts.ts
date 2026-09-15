@@ -109,6 +109,8 @@ export async function registerAccount(
 ): Promise<void> {
   const name = username.trim().toLowerCase();
   const existing = loadIdentity();
+  if (existing?.managed)
+    throw new Error("Use your CreatorHive account settings.");
   const secret = existing?.secretKey ?? generateSecretKey();
   const vault = await encrypt(password, secret, name);
   const account = await request(
@@ -167,7 +169,8 @@ export async function changeAccountPassword(
   newPassword: string,
 ): Promise<void> {
   const identity = loadIdentity();
-  if (!identity?.username) throw new Error("Create a login first.");
+  if (!identity?.username || identity.managed)
+    throw new Error("Create a login first.");
   const vault = await encrypt(
     newPassword,
     identity.secretKey,

@@ -1,3 +1,6 @@
+import { CommunityWelcome } from "@/features/onboarding/CommunityWelcome";
+import { useSessionDraft } from "@/shared/lib/use-session-draft";
+import { ContentSkeleton } from "@/shared/ui/ContentSkeleton";
 import {
   CommunityShell,
   findAnnouncementChannel,
@@ -83,17 +86,38 @@ export function ChatPage() {
     return () => window.removeEventListener("keydown", dismiss);
   }, []);
   const [watchingRoom, setWatchingRoom] = useState<string | null>(null);
-  const { channels, loading: channelsLoading } = useChannels();
+  const {
+    channels,
+    loading: channelsLoading,
+    error: channelsError,
+    retry: retryChannels,
+  } = useChannels();
   const [activeId, setActiveId] = useState<string | null>(null);
-  const { messages, loading, send, editMessage, deleteMessage } =
-    useMessages(activeId);
-  const [draft, setDraft] = useState("");
+  const search = useSearch({ from: "/chat" });
+  const {
+    messages,
+    loading,
+    send,
+    editMessage,
+    deleteMessage,
+    targetLoading,
+    targetError,
+    retryTarget,
+  } = useMessages(
+    activeId,
+    search.channel === activeId ? search.event : undefined,
+  );
+  const [draft, setDraft] = useSessionDraft(
+    identity?.pubkey,
+    `chat:${activeId ?? ""}`,
+  );
+  const [sending, setSending] = useState(false);
   // The names picked from the popup this draft, so send() can attach `p`
   // tags for exactly the mentions still present in the final text.
   const draftMentions = useRef<Map<string, string>>(new Map());
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [mentionIndex, setMentionIndex] = useState(0);
-  const composerRef = useRef<HTMLInputElement>(null);
+  const composerRef = useRef<HTMLTextAreaElement>(null);
   const [sendError, setSendError] = useState<string | null>(null);
   const [attachment, setAttachment] = useState<UploadedMedia | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -121,7 +145,6 @@ export function ChatPage() {
   const { reactions, toggle } = useReactions(activeId, pubkey);
   const { typists, noteTyping } = useTyping(activeId, pubkey);
   const { onlineCount, statusOf } = usePresence(pubkey);
-  const search = useSearch({ from: "/chat" });
   const navigate = useNavigate();
   const names = useNames();
   const members = useMembers(activeId);
@@ -134,8 +157,9 @@ export function ChatPage() {
   const timelineContentRef = useRef<HTMLDivElement>(null);
   const followLatest = useRef(true);
 
-  // Open the first channel once the list arrives, so the app is never a blank
-  // screen waiting for a click. A ?channel= deep link (inbox, agents) wins
+  // Prefer General once the list arrives, so new members can join a conversation.
+  // Fall back to another channel when this community has no General.
+  // A ?channel= deep link (inbox, agents) wins
   // over the default, and re-navigating while mounted switches channels.
   const announcementChannel = findAnnouncementChannel(channels);
   const announcementsOpen = search.view === "announcements";
@@ -145,15 +169,26 @@ export function ChatPage() {
       setActiveId(announcementChannel?.id ?? null);
       return;
     }
-    if (wantedChannel && channels.some((c) => c.id === wantedChannel)) {
-      setActiveId(wantedChannel);
+    if (wantedChannel) {
+      if (channels.some((c) => c.id === wantedChannel))
+        setActiveId(wantedChannel);
+      else if (!channelsLoading) setActiveId(null);
       return;
     }
-    if (!activeId && channels.length > 0) {
-      setActiveId(channels[0].id);
+    if (!activeId && !channelsLoading && channels.length > 0) {
+      setActiveId(
+        (
+          channels.find(
+            (channel) =>
+              channel.kind === "channel" &&
+              channel.name.toLowerCase() === "general",
+          ) ?? channels[0]
+        ).id,
+      );
     }
   }, [
     channels,
+    channelsLoading,
     activeId,
     wantedChannel,
     announcementsOpen,
@@ -212,6 +247,46 @@ export function ChatPage() {
     }
   }, []);
 
+  const focusedTarget = useRef<string | null>(null);
+  useLayoutEffect(() => {
+    if (!search.event) {
+      focusedTarget.current = null;
+      return;
+    }
+    if (
+      targetLoading ||
+      targetError ||
+      activeId !== search.channel ||
+      focusedTarget.current === search.event
+    )
+      return;
+    const message = messages.find((item) => item.id === search.event);
+    if (!message) return;
+    if (
+      message.threadRoot !== message.id &&
+      openThreadRoot !== message.threadRoot
+    ) {
+      setOpenThreadRoot(message.threadRoot);
+      return;
+    }
+    const element = document.querySelector<HTMLElement>(
+      `[data-message-id="${CSS.escape(message.id)}"]`,
+    );
+    if (!element) return;
+    followLatest.current = false;
+    element.scrollIntoView({ block: "center", behavior: "instant" });
+    element.focus({ preventScroll: true });
+    focusedTarget.current = search.event;
+  }, [
+    search.event,
+    search.channel,
+    activeId,
+    messages,
+    openThreadRoot,
+    targetLoading,
+    targetError,
+  ]);
+
   const active = channels.find((c) => c.id === activeId);
   const canPublish =
     active?.postingPolicy !== "admins" ||
@@ -228,11 +303,17 @@ export function ChatPage() {
     return null;
   }
 
-  function selectChannel(id: string) {
+  function selectChannel(id: string, eventId?: string) {
     setActiveId(id);
     void navigate({
       to: "/chat",
-      search: { ...search, view: undefined, channel: id },
+      search: {
+        ...search,
+        view: undefined,
+        room: undefined,
+        channel: id,
+        event: eventId,
+      },
     });
   }
 
@@ -253,7 +334,7 @@ export function ChatPage() {
     return { at, query };
   }
 
-  function onComposerChange(event: React.ChangeEvent<HTMLInputElement>) {
+  function onComposerChange(event: React.ChangeEvent<HTMLTextAreaElement>) {
     const value = event.target.value;
     setDraft(value);
     noteTyping();
@@ -299,20 +380,23 @@ export function ChatPage() {
   async function onSend(event: React.FormEvent) {
     event.preventDefault();
     const text = draft.trim();
-    if (!text && !attachment) {
+    if (sending || (!text && !attachment)) {
       return;
     }
-    setDraft("");
+    setSending(true);
     setSendError(null);
     setMentionQuery(null);
     const media = attachment;
-    setAttachment(null);
     const mentions = outgoingMentions(text);
-    draftMentions.current.clear();
     try {
       await send(text, undefined, media ? [media] : undefined, mentions);
+      setDraft("");
+      setAttachment(null);
+      draftMentions.current.clear();
     } catch (error) {
       setSendError(error instanceof Error ? error.message : "could not send");
+    } finally {
+      setSending(false);
     }
   }
 
@@ -445,6 +529,9 @@ export function ChatPage() {
               ) : null}
             </header>
 
+            {!announcementsOpen && active?.kind !== "dm" && (
+              <CommunityWelcome />
+            )}
             {active && videoOpen ? (
               <Suspense
                 fallback={
@@ -466,11 +553,40 @@ export function ChatPage() {
               className="hive-timeline flex-1 overflow-y-auto"
             >
               <div ref={timelineContentRef}>
-                {loading && messages.length === 0 ? (
-                  <div className="hive-empty" role="status">
-                    <p>Loading the conversation…</p>
-                  </div>
-                ) : announcementsOpen && !active ? (
+                {search.channel &&
+                  !active &&
+                  !channelsLoading &&
+                  !channelsError && (
+                    <p className="hive-message-destination" role="alert">
+                      This channel is unavailable. Choose another channel or ask
+                      an admin for access.
+                    </p>
+                  )}
+                {targetLoading && (
+                  <p className="hive-message-destination" role="status">
+                    Finding your message…
+                  </p>
+                )}
+                {targetError && (
+                  <p className="hive-message-destination" role="alert">
+                    {targetError}{" "}
+                    <button type="button" onClick={retryTarget}>
+                      Retry
+                    </button>
+                  </p>
+                )}
+                {channelsError && messages.length === 0 ? (
+                  <p className="hive-message-destination" role="status">
+                    Couldn’t load this channel.{" "}
+                    <button type="button" onClick={retryChannels}>
+                      Retry
+                    </button>
+                  </p>
+                ) : (loading || (channelsLoading && channels.length === 0)) &&
+                  messages.length === 0 ? (
+                  <ContentSkeleton />
+                ) : search.channel && !active ? null : announcementsOpen &&
+                  !active ? (
                   <div className="hive-empty hive-announcements-empty">
                     <Megaphone aria-hidden="true" />
                     <h3>Community updates belong here.</h3>
@@ -483,10 +599,15 @@ export function ChatPage() {
                 ) : messages.length === 0 ? (
                   <div className="hive-empty">
                     <Users aria-hidden="true" />
-                    <h3>Make yourself at home.</h3>
+                    <h3>
+                      {canPublish
+                        ? "Make yourself at home."
+                        : "You’re up to date."}
+                    </h3>
                     <p>
-                      This conversation is just getting started. Share a
-                      question, an idea, or what you’re building.
+                      {canPublish
+                        ? "This conversation is just getting started. Share a question, an idea, or what you’re building."
+                        : "Community announcements will appear here. Only channel owners and admins can post."}
                     </p>
                   </div>
                 ) : (
@@ -621,7 +742,8 @@ export function ChatPage() {
                       <Mic size={19} aria-hidden="true" />
                     </button>
                   ) : null}
-                  <input
+                  <textarea
+                    rows={1}
                     ref={composerRef}
                     value={draft}
                     aria-label={
@@ -633,7 +755,12 @@ export function ChatPage() {
                     }
                     onChange={onComposerChange}
                     onKeyDown={(event) => {
+                      if (event.nativeEvent.isComposing) return;
                       if (mentionCandidates.length === 0) {
+                        if (event.key === "Enter" && !event.shiftKey) {
+                          event.preventDefault();
+                          event.currentTarget.form?.requestSubmit();
+                        }
                         return;
                       }
                       if (
@@ -647,7 +774,10 @@ export function ChatPage() {
                             (current + step + mentionCandidates.length) %
                             mentionCandidates.length,
                         );
-                      } else if (event.key === "Enter" || event.key === "Tab") {
+                      } else if (
+                        (event.key === "Enter" && !event.shiftKey) ||
+                        event.key === "Tab"
+                      ) {
                         event.preventDefault();
                         pickMention(mentionCandidates[mentionIndex]);
                       } else if (event.key === "Escape") {
@@ -655,6 +785,8 @@ export function ChatPage() {
                       }
                     }}
                     disabled={!activeId}
+                    readOnly={sending}
+                    aria-busy={sending}
                     placeholder={
                       active
                         ? active.kind === "dm"
@@ -674,7 +806,9 @@ export function ChatPage() {
                     type="submit"
                     aria-label="Send"
                     disabled={
-                      !activeId || (draft.trim().length === 0 && !attachment)
+                      sending ||
+                      !activeId ||
+                      (draft.trim().length === 0 && !attachment)
                     }
                     className="shrink-0 rounded-lg bg-amber-500 px-3 py-2 font-semibold text-neutral-950 text-sm disabled:opacity-40"
                   >
@@ -690,12 +824,7 @@ export function ChatPage() {
                   </span>
                 </div>
               </form>
-            ) : (
-              <p className="hive-announcement-note">
-                Announcements · Only channel owners and admins can publish. You
-                can read and react here.
-              </p>
-            )}
+            ) : null}
           </main>
 
           {!membersOpen && !watchingRoom && !openThread && (
@@ -732,6 +861,7 @@ export function ChatPage() {
             </Suspense>
           ) : openThread && !membersOpen ? (
             <ThreadPanel
+              targetId={search.event}
               canPublish={canPublish}
               thread={openThread}
               selfPubkey={pubkey}

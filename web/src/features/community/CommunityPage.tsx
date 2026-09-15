@@ -33,6 +33,7 @@ export function CommunityPage() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [reason, setReason] = useState("");
 
   async function confirm() {
     if (!change || busy) return;
@@ -43,6 +44,16 @@ export function CommunityPage() {
       await publishCommunityCommand(change.kind, [
         ["p", change.pubkey],
         ...(change.role ? [["role", change.role]] : []),
+        ...(change.kind === 9032
+          ? [
+              ["reason", reason],
+              [
+                "expected",
+                roster.data?.find((member) => member.pubkey === change.pubkey)
+                  ?.role || "member",
+              ],
+            ]
+          : []),
       ]);
       setMessage("The relay accepted the change.");
       setChange(null);
@@ -236,11 +247,28 @@ export function CommunityPage() {
                 ? "Community admins can add and remove ordinary members."
                 : "This member will have ordinary member access."}
           </p>
+          {change.kind === 9032 && (
+            <label>
+              Reason
+              <textarea
+                value={reason}
+                onChange={(event) => setReason(event.target.value)}
+                minLength={3}
+                maxLength={500}
+              />
+            </label>
+          )}
           {error ? <p role="alert">{error}</p> : null}
           <button type="button" disabled={busy} onClick={() => setChange(null)}>
             Cancel
           </button>
-          <button type="button" disabled={busy} onClick={() => void confirm()}>
+          <button
+            type="button"
+            disabled={
+              busy || (change.kind === 9032 && reason.trim().length < 3)
+            }
+            onClick={() => void confirm()}
+          >
             {busy ? "Waiting for relay…" : "Confirm change"}
           </button>
         </CommunityDialog>

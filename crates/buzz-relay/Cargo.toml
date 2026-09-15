@@ -60,6 +60,8 @@ sqlx = { workspace = true }
 reqwest = { workspace = true }
 base64 = "0.22"
 argon2 = "0.5.3"
+ring = "0.17"
+zeroize = { workspace = true }
 buzz-sdk = { workspace = true }
 buzz-workflow = { workspace = true, features = ["reqwest"] }
 buzz-media = { workspace = true }

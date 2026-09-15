@@ -9,6 +9,77 @@ html {
 }
 
 /* CreatorHive community surfaces share a warm, restrained charcoal palette. */
+.hive-skeleton {
+  display: block;
+  height: 0.65rem;
+  border-radius: 0.3rem;
+  background: linear-gradient(
+    100deg,
+    #89909612 25%,
+    #89909626 50%,
+    #89909612 75%
+  );
+  background-size: 200% 100%;
+  animation: hive-skeleton-shimmer 2s ease-in-out infinite;
+}
+.hive-content-skeleton {
+  padding: 0.75rem 0;
+}
+.hive-skeleton-message {
+  padding: 0.75rem 0;
+  margin-bottom: 0.75rem;
+}
+.hive-skeleton-author {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.hive-skeleton-avatar {
+  width: 1.875rem;
+  height: 1.875rem;
+  border-radius: 0.6rem;
+  flex-shrink: 0;
+}
+.hive-skeleton-name {
+  width: 5rem;
+}
+.hive-skeleton-time {
+  width: 2.5rem;
+  height: 0.45rem;
+}
+.hive-skeleton-copy {
+  display: grid;
+  gap: 0.65rem;
+  padding: 0.65rem 0 0 2.5rem;
+  max-width: 34rem;
+}
+.hive-content-skeleton.is-feed .hive-skeleton-message {
+  padding: 1rem;
+  border: 1px solid var(--hive-border);
+  border-radius: 0.75rem;
+}
+.hive-content-skeleton.is-feed .hive-skeleton-copy {
+  padding: 1rem 0 0.5rem;
+}
+.hive-channel-skeleton {
+  display: grid;
+  gap: 1rem;
+  padding: 0.65rem 0.5rem;
+}
+@keyframes hive-skeleton-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hive-skeleton {
+    animation: none;
+  }
+}
+
 .hive-app {
   --color-neutral-950: #141516;
   --color-neutral-900: #1c1e20;
@@ -900,4 +971,38 @@ html {
   text-decoration: underline;
   text-underline-offset: 0.25rem;
   color: #fcd34d;
+}
+
+.hive-private-welcome {
+  position: relative;
+  margin: 0.7rem 1rem;
+  padding: 0.8rem 1rem;
+  background: #b9944310;
+  border-left: 2px solid #edb95c;
+}
+.hive-private-welcome > button {
+  position: absolute;
+  right: 0.5rem;
+  top: 0.5rem;
+  padding: 0.4rem;
+}
+.hive-private-welcome h2 {
+  font-size: 1rem;
+  padding-right: 1rem;
+  margin: 0.3rem 0;
+}
+.hive-private-welcome > p {
+  font-size: 0.7rem;
+}
+.hive-private-welcome nav {
+  display: flex;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+  margin-top: 0.65rem;
+  font-size: 0.65rem;
+}
+.hive-app .hive-private-welcome a {
+  color: var(--chat-accent, #d1a34b);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
 }

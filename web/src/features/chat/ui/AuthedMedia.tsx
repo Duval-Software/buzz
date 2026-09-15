@@ -7,6 +7,7 @@
  */
 
 import { useAuthedMediaUrl } from "@/features/chat/media-auth";
+import { cn } from "@/shared/lib/cn";
 
 export function AuthedImage({
   url,
@@ -29,10 +30,11 @@ export function AuthedImage({
   if (!src) {
     return (
       <div
-        className={className}
-        style={{ ...style, minHeight: "6rem" }}
+        className={cn(className, "hive-skeleton")}
+        style={{ ...style, height: "auto", minHeight: "6rem" }}
         role="status"
         aria-label="Loading attachment"
+        aria-busy="true"
       />
     );
   }
@@ -66,10 +68,11 @@ export function AuthedVideo({
   if (!src) {
     return (
       <div
-        className={className}
-        style={{ ...style, minHeight: "6rem" }}
+        className={cn(className, "hive-skeleton")}
+        style={{ ...style, height: "auto", minHeight: "6rem" }}
         role="status"
         aria-label="Loading video"
+        aria-busy="true"
       />
     );
   }
@@ -101,7 +104,15 @@ export function AuthedAudio({
       </p>
     );
   if (!src) {
-    return <p className={className}>loading…</p>;
+    return (
+      <div
+        className={cn(className, "hive-skeleton")}
+        role="status"
+        aria-label="Loading audio"
+        aria-busy="true"
+        style={{ minHeight: "2rem" }}
+      />
+    );
   }
   return (
     // biome-ignore lint/a11y/useMediaCaption: recorded speech carries no caption track

@@ -3,6 +3,7 @@
  * HTTP requests to the relay (used by isomorphic-git for smart HTTP transport).
  */
 
+import { managedAccountsEnabled } from "./supabase";
 import { loadIdentity } from "./identity";
 import { finalizeEvent, getPublicKey } from "nostr-tools/pure";
 import { signNostrEvent } from "./nostr-signer";
@@ -39,11 +40,16 @@ export async function makeNip98AuthHeader(
   // Binary bodies hash themselves and pass the digest; string bodies hash here.
   const payload =
     options?.payloadSha256 ??
-    (options?.body !== undefined ? await sha256Hex(options.body) : undefined);
+    (options?.body !== undefined ||
+    (managedAccountsEnabled && ["POST", "PUT", "PATCH"].includes(method))
+      ? await sha256Hex(options?.body ?? "")
+      : undefined);
   if (payload !== undefined) {
     tags.push(["payload", payload]);
-    tags.push(["nonce", crypto.randomUUID()]);
   }
+  tags.push(["nonce", crypto.randomUUID()]);
+  if (managedAccountsEnabled && options?.secretKey)
+    throw new Error("Please use your CreatorHive account.");
   const unsigned = {
     kind: 27235,
     tags,

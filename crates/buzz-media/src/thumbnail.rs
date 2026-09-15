@@ -49,3 +49,47 @@ pub fn generate_image_metadata_sync(
         Some(thumb_bytes),
     ))
 }
+
+/// Decode a bounded still image and create a metadata-free portfolio JPEG.
+/// Never publish the caller's original bytes (EXIF, embedded profiles or scripts).
+pub fn profile_variant(bytes: &[u8]) -> Result<Vec<u8>, MediaError> {
+    let mut reader = image::ImageReader::new(Cursor::new(bytes))
+        .with_guessed_format()
+        .map_err(|e| MediaError::StorageError(e.to_string()))?;
+    if !matches!(
+        reader.format(),
+        Some(ImageFormat::Png | ImageFormat::Jpeg | ImageFormat::WebP)
+    ) {
+        return Err(MediaError::StorageError(
+            "Use a PNG, JPEG or WebP image".into(),
+        ));
+    }
+    let mut limits = image::Limits::default();
+    limits.max_image_width = Some(6000);
+    limits.max_image_height = Some(6000);
+    limits.max_alloc = Some(128 * 1024 * 1024);
+    reader.limits(limits);
+    let img = reader.decode()?.thumbnail(1600, 1600).to_rgb8();
+    let mut output = Vec::new();
+    image::DynamicImage::ImageRgb8(img)
+        .write_to(&mut Cursor::new(&mut output), ImageFormat::Jpeg)?;
+    Ok(output)
+}
+
+#[cfg(test)]
+mod profile_tests {
+    use super::*;
+    #[test]
+    fn portfolio_image_is_reencoded_and_rejects_nonimages() {
+        assert!(profile_variant(b"<svg onload='alert(1)'/>").is_err());
+        let image = image::DynamicImage::new_rgb8(12, 12);
+        let mut png = Vec::new();
+        image
+            .write_to(&mut Cursor::new(&mut png), ImageFormat::Png)
+            .unwrap();
+        png.extend_from_slice(b"private metadata");
+        let jpeg = profile_variant(&png).unwrap();
+        assert_eq!(image::guess_format(&jpeg).unwrap(), ImageFormat::Jpeg);
+        assert!(!jpeg.windows(16).any(|b| b == b"private metadata"));
+    }
+}

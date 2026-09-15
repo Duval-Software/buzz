@@ -1,0 +1,32 @@
+{
+  "name": "creatorhive-app-preview",
+  "production_branch": "creatorhive-web",
+  "source": {
+    "type": "github",
+    "config": {
+      "owner": "Duval-Software",
+      "owner_id": "258935190",
+      "repo_name": "buzz",
+      "repo_id": "1319389582",
+      "production_branch": "creatorhive-web",
+      "production_deployments_enabled": true,
+      "preview_deployment_setting": "none",
+      "pr_comments_enabled": false
+    }
+  },
+  "build_config": {
+    "root_dir": "",
+    "build_command": "corepack enable && pnpm --filter buzz-web... install --frozen-lockfile && pnpm --dir web build",
+    "destination_dir": "web/dist",
+    "build_caching": true
+  },
+  "deployment_configs": {
+    "production": {
+      "env_vars": {
+        "NODE_VERSION": { "type": "plain_text", "value": "22.16.0" },
+        "SKIP_DEPENDENCY_INSTALL": { "type": "plain_text", "value": "true" },
+        "VITE_MANAGED_ACCOUNTS": { "type": "plain_text", "value": "false" }
+      }
+    }
+  }
+}

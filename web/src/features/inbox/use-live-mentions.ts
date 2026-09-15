@@ -47,14 +47,16 @@ export function useLiveChannelMentions(
     const socket = getSocket(relayWsUrl());
     let cancelled = false;
     const resolve = async () => {
-      const memberships = await socket.queryOnce([
-        {
-          kinds: [KIND_GROUP_MEMBERS],
-          "#p": [selfPubkey.toLowerCase()],
-          limit: 100,
-        },
-      ]);
-      if (cancelled) {
+      const memberships = await socket
+        .queryOnce([
+          {
+            kinds: [KIND_GROUP_MEMBERS],
+            "#p": [selfPubkey.toLowerCase()],
+            limit: 100,
+          },
+        ])
+        .catch(() => null);
+      if (cancelled || !memberships) {
         return;
       }
       const ids = [

@@ -1,0 +1,371 @@
+.hive-account-scene {
+  position: relative;
+  isolation: isolate;
+  min-height: 100dvh;
+  background: #111412;
+  color: #f4f1e9;
+}
+.hive-account-scene::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background:
+    linear-gradient(
+      90deg,
+      #111412 0%,
+      #111412f5 26%,
+      #11141280 51%,
+      #11141200 74%
+    ),
+    linear-gradient(
+      0deg,
+      #111412dc,
+      transparent 25%,
+      transparent 80%,
+      #11141280
+    ),
+    url("/creatorhive-workshop.png") center right / cover no-repeat;
+  pointer-events: none;
+}
+.hive-account-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+.hive-account-header .hive-brand {
+  padding: 0;
+  gap: 0.65rem;
+  font-size: 1.15rem;
+}
+.hive-account-header .hive-brand-mark {
+  width: 3rem;
+  height: 3rem;
+}
+.hive-account-header .hive-brand small {
+  display: none;
+}
+.hive-account-header > a:not(.hive-brand) {
+  color: #e0ded5;
+  font-size: 0.65rem;
+  padding: 0.5rem 0;
+}
+.hive-account-header > a:hover {
+  color: #f2c773;
+}
+.hive-google-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  width: 100%;
+  min-height: 2.7rem;
+  border-radius: 0.6rem;
+  border: 1px solid #deded8;
+  background: #fff;
+  color: #252723;
+  font-size: 0.75rem;
+  font-weight: 600;
+  transition:
+    background 160ms,
+    transform 160ms;
+}
+.hive-google-button:hover:not(:disabled) {
+  background: #f0f0e9;
+  transform: translateY(-1px);
+}
+.hive-google-button:disabled {
+  opacity: 0.7;
+}
+.hive-google-button > svg {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+}
+.hive-login-note {
+  color: #acb0a8;
+  font-size: 0.6rem;
+  margin-top: 0.8rem;
+}
+.hive-account-error {
+  padding: 0.7rem 0;
+  color: #ffc7b7;
+  font-size: 0.75rem;
+  overflow-wrap: anywhere;
+}
+.hive-account-error button {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  margin-top: 0.5rem;
+}
+.hive-account-status {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.75rem;
+  color: #c5c8be;
+}
+.hive-account-status svg {
+  width: 1rem;
+  height: 1rem;
+}
+.hive-account-spinner,
+.hive-account-status svg {
+  animation: hive-account-spin 1s linear infinite;
+}
+@keyframes hive-account-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes hive-entry-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (max-width: 720px) {
+  .hive-account-scene::before {
+    background:
+      linear-gradient(0deg, #111412 8%, #111412e6 42%, #11141250 75%, #11141299),
+      url("/creatorhive-workshop.png") 68% top / auto 65vh no-repeat;
+  }
+  .hive-account-header .hive-brand {
+    font-size: 1rem;
+  }
+  .hive-account-header .hive-brand-mark {
+    width: 2.25rem;
+    height: 2.25rem;
+  }
+}
+.hive-sign-in {
+  min-height: 100dvh;
+  display: grid;
+  grid-template-columns: 1fr 1.1fr;
+  background: #141716;
+}
+.hive-sign-in-panel {
+  min-width: 0;
+  padding: 2rem clamp(1.25rem, 4vw, 3.5rem);
+  display: flex;
+  flex-direction: column;
+}
+.hive-sign-in .hive-brand {
+  padding: 0;
+  font-size: 1.65rem;
+  justify-content: center;
+  gap: 0.6rem;
+}
+.hive-sign-in .hive-brand small {
+  display: none;
+}
+.hive-sign-in .hive-brand-mark {
+  width: 3.6rem;
+  height: 3.6rem;
+}
+.hive-sign-in-form {
+  width: min(100%, 21rem);
+  margin: auto;
+  padding: 3rem 0;
+  animation: hive-entry-in 500ms ease-out both;
+}
+.hive-sign-in h1 {
+  font-size: clamp(2.3rem, 3.8vw, 3.25rem);
+  font-weight: 450;
+  line-height: 1.08;
+  letter-spacing: -0.045em;
+  margin: 0;
+}
+.hive-sign-in h1 span {
+  color: #f2cf8f;
+}
+.hive-sign-in-description {
+  font-size: 0.8rem;
+  line-height: 1.75;
+  color: #b7beb9;
+  margin: 0.6rem 0 1.2rem;
+  text-align: center;
+}
+.hive-sign-in-form .hive-google-button {
+  border-radius: 0.8rem;
+  min-height: 3rem;
+}
+.hive-sign-in-form .hive-login-note {
+  text-align: center;
+  margin-top: 1rem;
+}
+.hive-sign-in-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 0.6rem;
+  color: #a4afa7;
+}
+.hive-sign-in-footer a:hover {
+  color: #f2cf8f;
+}
+.hive-sign-in-hero {
+  position: relative;
+  min-width: 0;
+  margin: 0.8rem 0.8rem 0.8rem 0;
+  border-radius: 1.4rem;
+  overflow: hidden;
+  background: #222721;
+  animation: hive-hero-in 650ms ease-out both;
+}
+.hive-sign-in-hero > img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 70% center;
+}
+.hive-sign-in-hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(0deg, #101813f5, transparent 50%);
+}
+.hive-sign-in-caption {
+  position: absolute;
+  z-index: 1;
+  bottom: 0;
+  padding: clamp(1.25rem, 4vw, 3rem);
+  max-width: 27rem;
+}
+.hive-sign-in-caption > p:first-child {
+  color: #f2cf8f;
+  font-size: 0.55rem;
+  letter-spacing: 0.2em;
+  margin-bottom: 1rem;
+}
+.hive-sign-in-caption h2 {
+  font-size: clamp(1.5rem, 2.8vw, 2.3rem);
+  font-weight: 450;
+  line-height: 1.15;
+  margin: 0 0 1rem;
+}
+.hive-sign-in-caption > p:last-child {
+  color: #c5cdc4;
+  font-size: 0.75rem;
+  line-height: 1.7;
+  max-width: 19rem;
+}
+@keyframes hive-hero-in {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+@media (max-width: 720px) {
+  .hive-sign-in {
+    grid-template-columns: 1fr;
+  }
+  .hive-sign-in-panel {
+    min-height: 100dvh;
+    padding: 1.25rem;
+  }
+  .hive-sign-in-form {
+    padding: 2rem 0;
+  }
+  .hive-sign-in-hero {
+    display: none;
+  }
+  .hive-sign-in h1 {
+    font-size: 2.6rem;
+  }
+  .hive-sign-in-footer {
+    flex-wrap: wrap;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hive-sign-in-form,
+  .hive-sign-in-hero,
+  .hive-account-spinner,
+  .hive-account-status svg {
+    animation: none;
+  }
+  .hive-google-button {
+    transition: none;
+  }
+}
+
+.hive-email-access h2 {
+  font-size: 1rem;
+  text-align: center;
+  margin: 0 0 1rem;
+}
+.hive-email-access .hive-credentials {
+  gap: 0.85rem;
+}
+.hive-email-access .hive-credentials label {
+  font-size: 0.7rem;
+  color: #c4cac5;
+}
+.hive-email-access .hive-credentials input {
+  padding: 0.7rem 0.85rem;
+  min-height: 2.6rem;
+  background: #ffffff05;
+  border-color: #ffffff24;
+}
+.hive-email-access .hive-primary-button {
+  border-radius: 0.8rem;
+  min-height: 2.7rem;
+  font-size: 0.75rem;
+}
+.hive-email-reset {
+  justify-self: end;
+  font-size: 0.6rem;
+  color: #d5c09c;
+}
+.hive-email-switch {
+  text-align: center;
+  font-size: 0.65rem;
+  color: #aeb8b0;
+  margin-top: 1rem;
+}
+.hive-email-switch button {
+  color: #f2cf8f;
+  text-underline-offset: 0.2em;
+}
+.hive-email-switch button:hover,
+.hive-email-reset:hover {
+  text-decoration: underline;
+}
+.hive-sign-in-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  margin: 1rem 0;
+  color: #8e9a92;
+  font-size: 0.6rem;
+}
+.hive-sign-in-divider::before,
+.hive-sign-in-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: #ffffff1c;
+}
+.hive-sign-in-form {
+  padding-block: 0.75rem;
+}
+@media (max-width: 720px) {
+  .hive-sign-in .hive-brand {
+    font-size: 1.45rem;
+  }
+  .hive-sign-in .hive-brand-mark {
+    width: 3.1rem;
+    height: 3.1rem;
+  }
+}

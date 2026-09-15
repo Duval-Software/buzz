@@ -361,11 +361,12 @@
 .hive-chat .hive-composer-field:focus-within {
   border-color: var(--chat-accent);
 }
-.hive-chat .hive-composer-field > input {
+.hive-chat .hive-composer-field > :is(input, textarea) {
   color: var(--chat-text);
 }
 /* The composer owns the focus border; its text input is not a second field. */
-.hive-chat .hive-composer-field > input:not([type="file"]):focus-visible {
+.hive-chat .hive-composer-field
+  > :is(input:not([type="file"]), textarea):focus-visible {
   outline: none;
 }
 @media (prefers-reduced-motion: no-preference) {
@@ -677,7 +678,7 @@
 .hive-chat .hive-studio > h2 {
   margin: 6px 8px 5px;
 }
-.hive-chat .hive-section-heading {
+.hive-chat .hive-sidebar-section > .hive-section-heading {
   display: flex;
   align-items: center;
   gap: 4px;
@@ -713,11 +714,6 @@
 .hive-chat .hive-dm-heading > button {
   min-height: 28px;
   min-width: 28px;
-}
-.hive-chat .hive-browse-channels {
-  width: 100%;
-  text-align: left;
-  color: var(--chat-muted);
 }
 .hive-chat .hive-dm-empty {
   padding: 4px 8px;
@@ -762,45 +758,10 @@
   margin-left: auto;
   color: var(--chat-muted);
 }
-.hive-dialog .hive-channel-browser > div {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-.hive-dialog .hive-channel-browser input {
-  width: 100%;
-  padding: 8px;
-  border: 1px solid var(--hive-border);
-  margin: 12px 0 8px;
-}
-.hive-dialog .hive-channel-browser p {
-  font-size: 0.75rem;
-  color: var(--color-neutral-400);
-  margin: 8px 0;
-}
-.hive-dialog .hive-channel-browser > div > button {
-  min-height: 36px;
-  padding: 6px 8px;
-  border-radius: 4px;
-}
-.hive-dialog .hive-channel-browser > div > button:first-child {
-  flex: 1;
-  text-align: left;
-}
-.hive-dialog .hive-channel-browser button:hover {
-  background: var(--color-neutral-800);
-}
-.hive-dialog .hive-channel-browser button[aria-pressed="true"] {
-  color: var(--color-amber-400);
-}
 @media (max-width: 767px) {
-  .hive-chat .hive-section-heading,
+  .hive-chat .hive-sidebar-section > .hive-section-heading,
   .hive-chat .hive-dm-heading > button {
     min-height: 2.5rem;
-  }
-  .hive-dialog .hive-channel-browser > div > button {
-    min-height: 2.75rem;
   }
 }
 
@@ -825,4 +786,58 @@
   .hive-chat .hive-chat-sidebar {
     width: 16rem;
   }
+}
+
+.hive-navigation-dialog {
+  position: fixed;
+  inset: 0 auto 0 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  width: min(320px, calc(100vw - 48px));
+  max-width: none;
+  height: 100dvh;
+  max-height: none;
+  overflow: visible;
+  background: transparent;
+  color: inherit;
+}
+.hive-navigation-dialog::backdrop {
+  background: rgb(0 0 0 / 60%);
+}
+.hive-navigation-dialog .hive-chat-sidebar {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+.hive-navigation-close {
+  position: absolute;
+  top: 8px;
+  left: 100%;
+  width: 44px;
+  height: 44px;
+  color: white;
+  font-size: 1.5rem;
+}
+
+.hive-chat textarea,
+.hive-thread textarea {
+  resize: none;
+  field-sizing: content;
+  min-height: 44px;
+  max-height: 160px;
+}
+[data-message-id]:focus,
+[data-update-id]:focus {
+  outline: 2px solid var(--hive-accent, #d6a44c);
+  outline-offset: 3px;
+  border-radius: 8px;
+}
+.hive-message-destination {
+  padding: 1rem;
+  font-size: 0.875rem;
+}
+.hive-chat .hive-message-destination button {
+  text-decoration: underline;
+  padding: 0.5rem;
 }

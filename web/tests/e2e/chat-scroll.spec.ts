@@ -1,6 +1,23 @@
 import { expect, test } from "@playwright/test";
 import { installCommunityFixture } from "../helpers/community";
 
+test("community entry prefers General over alphabetically earlier conversations", async ({
+  page,
+}) => {
+  await installCommunityFixture(page, "Welcome", {
+    channelName: "General",
+    channelDelayMs: 200,
+  });
+  await page.goto("/chat");
+  await expect(
+    page.getByRole("textbox", { name: "Message #General" }),
+  ).toBeVisible();
+  await page.goto("/chat?channel=dm");
+  await expect(
+    page.getByRole("textbox", { name: "Message Builder" }),
+  ).toBeVisible();
+});
+
 for (const width of [1440, 390]) {
   test(`new chats open at the latest content at ${width}px`, async ({
     page,

@@ -79,11 +79,14 @@ function toNote(event: NostrEvent): PulseNote {
   };
 }
 
-export function usePulse(selfPubkey: string) {
+export function usePulse(selfPubkey: string, targetId?: string) {
   const socket = useMemo(() => getSocket(relayWsUrl()), []);
   const [base, setBase] = useState<Map<string, NostrEvent>>(new Map());
   const [overlays, setOverlays] = useState<Map<string, NostrEvent>>(new Map());
   const [loading, setLoading] = useState(true);
+  const [targetLoading, setTargetLoading] = useState(Boolean(targetId));
+  const [targetError, setTargetError] = useState("");
+  const [targetRetry, setTargetRetry] = useState(0);
   const remember = useCallback((event: NostrEvent) => {
     const setter = event.kind === 1 ? setBase : setOverlays;
     setter((previous) =>
@@ -92,6 +95,60 @@ export function usePulse(selfPubkey: string) {
         : new Map(previous).set(event.id, event),
     );
   }, []);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: retry reloads the linked update.
+  useEffect(() => {
+    let cancelled = false;
+    setTargetError("");
+    setTargetLoading(Boolean(targetId));
+    if (!targetId) return;
+    void (async () => {
+      try {
+        const events = await socket.queryOnce([
+          { kinds: [1], ids: [targetId], limit: 1 },
+          { kinds: [1], "#e": [targetId], limit: 100 },
+        ]);
+        const notes = events.filter(
+          (event) =>
+            event.kind === 1 && !event.tags.some((tag) => tag[0] === "h"),
+        );
+        const target = notes.find((event) => event.id === targetId);
+        if (!target)
+          throw new Error(
+            "This update is unavailable. It may have been deleted or your access changed.",
+          );
+        const overlays = await socket.queryOnce([
+          {
+            kinds: [5, 40003, 7],
+            "#e": notes.map((event) => event.id),
+            limit: 500,
+          },
+        ]);
+        if (cancelled) return;
+        for (const event of [...notes, ...overlays]) remember(event);
+        if (
+          overlays.some(
+            (event) =>
+              event.kind === 5 &&
+              event.pubkey === target.pubkey &&
+              event.tags.some((tag) => tag[0] === "e" && tag[1] === target.id),
+          )
+        )
+          throw new Error("This update has been deleted.");
+      } catch (cause) {
+        if (!cancelled)
+          setTargetError(
+            cause instanceof Error
+              ? cause.message
+              : "Could not load this update. Try again.",
+          );
+      } finally {
+        if (!cancelled) setTargetLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [socket, targetId, remember, targetRetry]);
   useEffect(
     () =>
       socket.subscribe([{ kinds: [1], limit: 100 }], {
@@ -274,5 +331,17 @@ export function usePulse(selfPubkey: string) {
       ["e", current.myLikeId ?? noteId],
     ]);
   };
-  return { notes, loading, publish, edit, remove, report, likesOf, toggleLike };
+  return {
+    notes,
+    loading,
+    publish,
+    edit,
+    remove,
+    report,
+    likesOf,
+    toggleLike,
+    targetLoading,
+    targetError,
+    retryTarget: () => setTargetRetry((n) => n + 1),
+  };
 }

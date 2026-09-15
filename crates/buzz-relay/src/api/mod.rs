@@ -6,6 +6,8 @@ pub mod bridge;
 pub mod events;
 pub mod git;
 pub mod invites;
+pub mod managed_accounts;
+pub mod managed_identity;
 pub mod media;
 pub mod mesh_demo;
 pub mod nip05;
@@ -276,3 +278,8 @@ pub mod relay_members {
         }
     }
 }
+
+/// Active-session community staff and own-appeal HTTP surfaces.
+pub mod staff;
+
+pub mod public_profiles;

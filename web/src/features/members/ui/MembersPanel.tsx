@@ -1,3 +1,5 @@
+import { ProfilePreview } from "@/features/profile/ui/ProfilePreview";
+import { MemberSearch } from "@/features/profile/ui/MemberSearch";
 import { ChannelPublishing } from "@/features/community/ChannelPublishing";
 import type { Channel } from "@/features/chat/use-chat";
 import type { ChannelMember } from "@/features/members/use-members";
@@ -25,11 +27,17 @@ export function MemberRow({
   const name = names(member.pubkey);
   return (
     <li className="flex items-center gap-2 rounded-lg px-2 py-1.5">
-      <AvatarDisc pubkey={member.pubkey} name={name} size={32} />
-      <span className="min-w-0 flex-1 truncate text-sm">
-        {name}
-        {!profile?.displayName ? <small>No display name set</small> : null}
-      </span>
+      <ProfilePreview
+        pubkey={member.pubkey}
+        name={name}
+        status={statusOf(member.pubkey)}
+      >
+        <AvatarDisc pubkey={member.pubkey} name={name} size={32} />
+        <span className="min-w-0 flex-1 truncate text-sm">
+          {name}
+          {!profile?.displayName ? <small>No display name set</small> : null}
+        </span>
+      </ProfilePreview>
       <PresenceDot status={statusOf(member.pubkey)} />
       {profile?.bot ? (
         <span className="shrink-0 rounded border border-neutral-700 px-1 text-neutral-500 text-xs">
@@ -84,6 +92,7 @@ export function MembersPanel({
           Close
         </button>
       </header>
+      <MemberSearch />
       <ul className="flex-1 overflow-y-auto p-2">
         {members.length === 0 && (
           <li className="p-2 text-neutral-500 text-sm">

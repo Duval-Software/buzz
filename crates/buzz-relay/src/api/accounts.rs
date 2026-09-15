@@ -234,6 +234,24 @@ pub(crate) async fn has_account_session(
     owner: Option<&nostr::PublicKey>,
     hash: Option<&str>,
 ) -> bool {
+    if super::managed_identity::enabled() {
+        // No legacy-key fallback in managed communities. Hosted agents have
+        // registry authority, never the owner's signing or administration access.
+        if let Some(hash) = hash {
+            return owner.is_none()
+                && state
+                    .db
+                    .managed_pubkey_session_active(tenant.community(), &actor.to_hex(), hash)
+                    .await
+                    .unwrap_or(false);
+        }
+        return owner.is_none()
+            && state
+                .db
+                .managed_hosted_agent_active(tenant.community(), &actor.to_hex())
+                .await
+                .unwrap_or(false);
+    }
     for key in std::iter::once(actor).chain(owner) {
         if !state
             .db
@@ -253,6 +271,10 @@ pub async fn session_guard(
     request: axum::extract::Request,
     next: axum::middleware::Next,
 ) -> Response {
+    if super::managed_identity::enabled() && request.uri().path().starts_with("/api/accounts/") {
+        return api_error(StatusCode::GONE, "Use your CreatorHive account to sign in.")
+            .into_response();
+    }
     if matches!(
         request.uri().path(),
         "/api/accounts/register" | "/api/accounts/login" | "/api/accounts/password"

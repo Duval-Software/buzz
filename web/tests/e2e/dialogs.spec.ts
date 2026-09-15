@@ -56,7 +56,7 @@ for (const width of [1440, 390]) {
             exact: true,
           })
           .click();
-      await page.getByRole("button", { name: /Your profile/ }).click();
+      await page.getByRole("button", { name: /^Account/ }).click();
       await check("Your account");
       await page
         .getByRole("button", { name: "Search the Hive", exact: true })
@@ -66,8 +66,6 @@ for (const width of [1440, 390]) {
         .getByRole("button", { name: "New message", exact: true })
         .click();
       await check("New message");
-      await page.getByRole("button", { name: /Browse channels/ }).click();
-      await check("Browse channels");
       await page.goto("/community");
       await page
         .getByRole("button", { name: "Make admin", exact: true })

@@ -2,6 +2,7 @@ packages:
   - "desktop"
   - "web"
   - "admin-web"
+  - "sso-demo"
 allowBuilds:
   esbuild: true
 overrides:

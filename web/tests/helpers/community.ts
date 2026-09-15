@@ -20,10 +20,22 @@ export async function installCommunityFixture(
       kind?: number;
       created_at?: number;
     }[];
+    chatEvents?: {
+      id: string;
+      content: string;
+      tags: string[][];
+      kind?: number;
+      linkedOnly?: boolean;
+    }[];
+    searchRefusals?: number;
     noIdentity?: boolean;
+    identitySecret?: Uint8Array;
     noChannels?: boolean;
+    noMessages?: boolean;
     channelRefusals?: number;
     channelName?: string;
+    channelDelayMs?: number;
+    contentReady?: Promise<void>;
     channelAbout?: string;
     selfProfile?: Record<string, unknown>;
     closeProfileQuery?: boolean;
@@ -35,7 +47,12 @@ export async function installCommunityFixture(
     forgedRoster?: boolean;
   } = {},
 ) {
-  const secret = generateSecretKey();
+  await page.route("**/api/identity/moderation/read", (route) =>
+    route.fulfill({
+      json: { items: [], banned: false, rename_required: false },
+    }),
+  );
+  const secret = options.identitySecret ?? generateSecretKey();
   const self = getPublicKey(secret);
   const relaySecret = generateSecretKey();
   const relayKey = getPublicKey(relaySecret);
@@ -110,6 +127,7 @@ export async function installCommunityFixture(
   }[] = [];
   const receivedRemote: string[] = [];
   const channelRequests: string[] = [];
+  let searchRequests = 0;
   page.on("request", (request) => {
     if (request.url().includes("tracker.invalid"))
       receivedRemote.push(request.url());
@@ -138,7 +156,7 @@ export async function installCommunityFixture(
       nip19.nsecEncode(secret),
     );
   await page.routeWebSocket(/.*/, (socket) => {
-    socket.onMessage((raw) => {
+    socket.onMessage(async (raw) => {
       const [kind, id, ...filters] = JSON.parse(String(raw));
       if (kind === "AUTH")
         socket.send(
@@ -156,11 +174,30 @@ export async function installCommunityFixture(
             "OK",
             id.id,
             !options.denyCommands,
-            options.denyCommands ? "restricted: fixture denied" : "",
+            options.denyCommands
+              ? "restricted: fixture denied"
+              : id.kind === 41010
+                ? 'response:{"channel_id":"dm","created":false}'
+                : "",
           ]),
         );
       }
       if (kind !== "REQ") return;
+      if (
+        filters.some((filter) => filter.search) &&
+        ++searchRequests <= (options.searchRefusals ?? 0)
+      ) {
+        socket.send(
+          JSON.stringify(["CLOSED", id, "restricted: search unavailable"]),
+        );
+        return;
+      }
+      if (
+        filters.some((filter) =>
+          filter.kinds?.some((value: number) => [1, 9, 39000].includes(value)),
+        )
+      )
+        await options.contentReady;
       if (filters.some((filter) => filter.kinds?.includes(39000))) {
         channelRequests.push(id);
         if (channelRequests.length <= (options.channelRefusals ?? 0)) {
@@ -186,6 +223,28 @@ export async function installCommunityFixture(
       }
       const emit = (data: ReturnType<typeof event>) =>
         socket.send(JSON.stringify(["EVENT", id, data]));
+      for (const item of options.chatEvents ?? []) {
+        if (
+          filters.some(
+            (filter) =>
+              filter.kinds?.includes(item.kind ?? 9) &&
+              (!item.linkedOnly ||
+                filter.ids ||
+                filter.search ||
+                filter["#e"]) &&
+              (!filter.ids || filter.ids.includes(item.id)) &&
+              (!filter["#h"] ||
+                item.tags.some(
+                  (tag) => tag[0] === "h" && filter["#h"].includes(tag[1]),
+                )) &&
+              (!filter["#e"] ||
+                item.tags.some(
+                  (tag) => tag[0] === "e" && filter["#e"].includes(tag[1]),
+                )),
+          )
+        )
+          emit(event(item.id, item.kind ?? 9, item.content, item.tags));
+      }
       if (options.pulseEvents) {
         const history = [
           ...options.pulseEvents.map((note) => ({
@@ -207,6 +266,7 @@ export async function installCommunityFixture(
             filters.some(
               (filter) =>
                 filter.kinds?.includes(entry.kind) &&
+                (!filter.ids || filter.ids.includes(entry.id)) &&
                 (!filter["#e"] ||
                   entry.tags.some(
                     (tag) => tag[0] === "e" && filter["#e"].includes(tag[1]),
@@ -239,20 +299,24 @@ export async function installCommunityFixture(
         filters.some((filter) => filter.kinds?.includes(39000))
       ) {
         emit(
-          event("channel", 39000, "", [
-            ["d", "markdown"],
-            ["name", options.channelName ?? "markdown"],
-            ["about", options.channelAbout ?? ""],
-            ["posting_policy", options.policy ?? "all"],
-          ]),
-        );
-        emit(
           event("dm", 39000, "", [
             ["d", "dm"],
             ["name", "dm"],
             ["t", "dm"],
             ["p", self],
             ["p", builder],
+          ]),
+        );
+        if (options.channelDelayMs)
+          await new Promise((resolve) =>
+            setTimeout(resolve, options.channelDelayMs),
+          );
+        emit(
+          event("channel", 39000, "", [
+            ["d", "markdown"],
+            ["name", options.channelName ?? "markdown"],
+            ["about", options.channelAbout ?? ""],
+            ["posting_policy", options.policy ?? "all"],
           ]),
         );
       }
@@ -310,7 +374,7 @@ export async function installCommunityFixture(
       const channel = filters.find(
         (filter) => filter.kinds?.includes(9) && filter["#h"],
       )?.["#h"][0];
-      if (channel) {
+      if (channel && !options.noMessages) {
         emit(
           event(`${channel}-root`, 9, messageContent ?? body, [
             ["h", channel],

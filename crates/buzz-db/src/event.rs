@@ -852,49 +852,14 @@ pub async fn soft_delete_event_and_update_thread(
     pool: &PgPool,
     community_id: CommunityId,
     event_id: &[u8],
-    parent_event_id: Option<&[u8]>,
-    root_event_id: Option<&[u8]>,
+    _parent_event_id: Option<&[u8]>,
+    _root_event_id: Option<&[u8]>,
 ) -> Result<bool> {
-    let mut tx = pool.begin().await?;
-
-    let result = sqlx::query(
-        "UPDATE events SET deleted_at = NOW() WHERE community_id = $1 AND id = $2 AND deleted_at IS NULL",
-    )
-    .bind(community_id.as_uuid())
-    .bind(event_id)
-    .execute(&mut *tx)
-    .await?;
-
-    let deleted = result.rows_affected() > 0;
-
-    if deleted {
-        if let Some(pid) = parent_event_id {
-            sqlx::query(
-                "UPDATE thread_metadata \
-                 SET reply_count = GREATEST(reply_count - 1, 0) \
-                 WHERE community_id = $1 AND event_id = $2",
-            )
-            .bind(community_id.as_uuid())
-            .bind(pid)
-            .execute(&mut *tx)
-            .await?;
-
-            if let Some(root_id) = root_event_id {
-                sqlx::query(
-                    "UPDATE thread_metadata \
-                     SET descendant_count = GREATEST(descendant_count - 1, 0) \
-                     WHERE community_id = $1 AND event_id = $2",
-                )
-                .bind(community_id.as_uuid())
-                .bind(root_id)
-                .execute(&mut *tx)
-                .await?;
-            }
-        }
-    }
-
-    tx.commit().await?;
-    Ok(deleted)
+    Ok(sqlx::query_scalar("SELECT moderation_delete_event($1,$2)")
+        .bind(community_id.as_uuid())
+        .bind(event_id)
+        .fetch_one(pool)
+        .await?)
 }
 
 /// Returns the `created_at` timestamp of the most recent non-deleted event in a channel.

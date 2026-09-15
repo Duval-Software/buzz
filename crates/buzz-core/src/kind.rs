@@ -368,6 +368,10 @@ pub const KIND_MODERATION_UNTIMEOUT: u32 = 9043;
 /// delete|kick|ban|timeout|dismiss|escalate — see
 /// `handlers/moderation_commands.rs` for the pinned vocabulary).
 pub const KIND_MODERATION_RESOLVE_REPORT: u32 = 9044;
+/// Require a member to choose a compliant username.
+pub const KIND_MODERATION_REQUIRE_RENAME: u32 = 9045;
+/// Review a member appeal without exposing it to the timeline.
+pub const KIND_MODERATION_REVIEW_APPEAL: u32 = 9046;
 
 /// Returns `true` for community moderation command kinds (9040–9044).
 ///
@@ -381,6 +385,8 @@ pub const fn is_moderation_command_kind(kind: u32) -> bool {
             | KIND_MODERATION_TIMEOUT
             | KIND_MODERATION_UNTIMEOUT
             | KIND_MODERATION_RESOLVE_REPORT
+            | KIND_MODERATION_REQUIRE_RENAME
+            | KIND_MODERATION_REVIEW_APPEAL
     )
 }
 
@@ -673,6 +679,8 @@ pub const ALL_KINDS: &[u32] = &[
     KIND_MODERATION_TIMEOUT,
     KIND_MODERATION_UNTIMEOUT,
     KIND_MODERATION_RESOLVE_REPORT,
+    KIND_MODERATION_REQUIRE_RENAME,
+    KIND_MODERATION_REVIEW_APPEAL,
     RELAY_ADMIN_ADD_MEMBER,
     RELAY_ADMIN_REMOVE_MEMBER,
     RELAY_ADMIN_CHANGE_ROLE,

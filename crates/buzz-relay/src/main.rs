@@ -35,6 +35,23 @@ fn buzz_auto_migrate_enabled(value: Option<&str>) -> bool {
     })
 }
 
+// Managed staff roles are assigned through the verified-account operator procedure.
+// A legacy environment key must never grant or restore managed owner authority.
+fn configured_bootstrap_owner(
+    managed: bool,
+    require_membership: bool,
+    owner: Option<&str>,
+) -> anyhow::Result<Option<&str>> {
+    if managed {
+        return Ok(None);
+    }
+    anyhow::ensure!(
+        !require_membership || owner.is_some(),
+        "RELAY_OWNER_PUBKEY required when BUZZ_REQUIRE_RELAY_MEMBERSHIP=true"
+    );
+    Ok(owner)
+}
+
 /// Controls how many per-community gauge series the usage poller emits.
 ///
 /// Datadog cost is proportional to the number of unique time-series.  With ~25
@@ -171,10 +188,49 @@ async fn main() -> anyhow::Result<()> {
         read_max_connections: config.db_read_pool_size,
         ..DbConfig::default()
     };
+    let managed_accounts = buzz_relay::api::managed_identity::enabled();
+    if managed_accounts {
+        anyhow::ensure!(
+            config.require_relay_membership,
+            "Managed deployments must require community membership"
+        );
+        for database_url in
+            std::iter::once(&db_config.database_url).chain(db_config.read_database_url.iter())
+        {
+            let parsed = url::Url::parse(database_url)?;
+            let modes: Vec<_> = parsed
+                .query_pairs()
+                .filter(|(k, _)| k == "sslmode")
+                .map(|(_, v)| v.into_owned())
+                .collect();
+            anyhow::ensure!(
+                modes == ["verify-full"],
+                "Managed accounts require database sslmode=verify-full"
+            );
+            anyhow::ensure!(
+                parsed.port() != Some(6543),
+                "Managed relay requires direct or session pooling, not transaction pooling"
+            );
+        }
+        anyhow::ensure!(
+            !buzz_auto_migrate_enabled(std::env::var("BUZZ_AUTO_MIGRATE").ok().as_deref()),
+            "Managed deployments require explicit operator migrations"
+        );
+        anyhow::ensure!(
+            db_config.max_connections <= 20 && db_config.read_max_connections.unwrap_or(20) <= 20,
+            "Managed database pools must be bounded to at most 20 connections each"
+        );
+    }
     let db = Db::new(&db_config).await.map_err(|e| {
         error!("Failed to connect to Postgres: {e}");
         anyhow::anyhow!("DB connection failed: {e}")
     })?;
+    if managed_accounts {
+        anyhow::ensure!(
+            db.managed_database_ready().await?,
+            "Managed accounts require the private buzz schema and an encrypted database connection"
+        );
+    }
     if db.has_read_pool() {
         info!("Postgres connected (writer + lazy read replica pool)");
         // Reader-down at boot must not crash or block the relay; this warn-only
@@ -197,9 +253,11 @@ async fn main() -> anyhow::Result<()> {
         info!("Skipping database migrations because BUZZ_AUTO_MIGRATE is not enabled");
     }
 
-    if let Err(e) = db.ensure_future_partitions(3).await {
-        error!("Failed to ensure partitions: {e}");
-    }
+    if auto_migrate {
+        if let Err(e) = db.ensure_future_partitions(3).await {
+            error!("Failed to ensure partitions: {e}");
+        }
+    } // Otherwise run buzz-admin maintain-partitions with the operator DDL role.
 
     // Freshness fence probe: cursor pages route to the replica only for
     // history the probe has verified as fully replayed. Deliberately AFTER
@@ -221,19 +279,11 @@ async fn main() -> anyhow::Result<()> {
         }
     }
 
-    // NIP-43: if membership enforcement is on, a valid owner pubkey is required.
-    // config.rs already strips invalid values with a warning; catch the resulting
-    // None here so we fail fast with a clear message rather than starting a relay
-    // that no one can administer.
-    if config.require_relay_membership && config.relay_owner_pubkey.is_none() {
-        error!(
-            "BUZZ_REQUIRE_RELAY_MEMBERSHIP=true but RELAY_OWNER_PUBKEY is not set or invalid. \
-             Set RELAY_OWNER_PUBKEY to a valid 64-char hex pubkey."
-        );
-        return Err(anyhow::anyhow!(
-            "RELAY_OWNER_PUBKEY required when BUZZ_REQUIRE_RELAY_MEMBERSHIP=true"
-        ));
-    }
+    let bootstrap_owner = configured_bootstrap_owner(
+        managed_accounts,
+        config.require_relay_membership,
+        config.relay_owner_pubkey.as_deref(),
+    )?;
 
     // NIP-43: relay membership requires a stable signing key.
     // Check this before any DB mutations so we fail fast — no point backfilling
@@ -294,7 +344,7 @@ async fn main() -> anyhow::Result<()> {
     // Idempotent — safe to run every startup. Must run before bootstrap_owner
     // so that existing allowlist users become relay members before the owner
     // is promoted (otherwise enabling membership locks everyone out).
-    if let Some(community) = deployment_community {
+    if let Some(community) = deployment_community.filter(|_| !managed_accounts) {
         match db.backfill_from_allowlist(community).await {
             Ok(0) => {}
             Ok(n) => info!("Backfilled {n} pubkey_allowlist entries into relay_members"),
@@ -315,9 +365,7 @@ async fn main() -> anyhow::Result<()> {
 
     // NIP-43: ensure the configured relay owner always holds the owner role
     // within the deployment community.
-    if let (Some(community), Some(owner_pubkey)) =
-        (deployment_community, config.relay_owner_pubkey.as_ref())
-    {
+    if let (Some(community), Some(owner_pubkey)) = (deployment_community, bootstrap_owner) {
         match db.bootstrap_owner(community, owner_pubkey).await {
             Ok(()) => info!(pubkey = %owner_pubkey, "Relay owner bootstrapped"),
             Err(e) => {
@@ -1986,9 +2034,9 @@ mod tests {
     use uuid::Uuid;
 
     use super::{
-        buzz_auto_migrate_enabled, dropped_in_memory_keys, idle_timeout_secs,
-        refresh_legacy_active_gauge_recency, run_periodic_until_cancelled, EmissionScope,
-        InMemoryMetricKey,
+        buzz_auto_migrate_enabled, configured_bootstrap_owner, dropped_in_memory_keys,
+        idle_timeout_secs, refresh_legacy_active_gauge_recency, run_periodic_until_cancelled,
+        EmissionScope, InMemoryMetricKey,
     };
     use metrics::GaugeFn;
     use metrics_util::{
@@ -2034,6 +2082,22 @@ mod tests {
         assert!(buzz_auto_migrate_enabled(Some(" 1 ")));
         assert!(buzz_auto_migrate_enabled(Some("yes")));
         assert!(buzz_auto_migrate_enabled(Some("on")));
+    }
+
+    #[test]
+    fn managed_startup_never_bootstraps_an_environment_owner() {
+        for owner in [None, Some("legacy-owner")] {
+            assert_eq!(configured_bootstrap_owner(true, true, owner).unwrap(), None);
+        }
+        assert!(configured_bootstrap_owner(false, true, None).is_err());
+        assert_eq!(
+            configured_bootstrap_owner(false, true, Some("legacy-owner")).unwrap(),
+            Some("legacy-owner")
+        );
+        assert_eq!(
+            configured_bootstrap_owner(false, false, None).unwrap(),
+            None
+        );
     }
 
     #[test]

@@ -1,0 +1,34 @@
+# Merge with deploy/compose/compose.yml copied beside the protected .env file.
+# This preview has its own Redis, MinIO and volumes; PostgreSQL is Supabase.
+name: creatorhive-preview
+networks:
+  buzz-net:
+    # Supabase direct PostgreSQL requires IPv6; preserve the isolated bridge.
+    enable_ipv6: true
+services:
+  relay:
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?set the restricted Supabase runtime URL}
+      BUZZ_AUTO_MIGRATE: "false"
+    ports: !override
+      - "127.0.0.1:3300:3000"
+    volumes:
+      - ./20260915/source/target/release/buzz-relay:/usr/local/bin/buzz-relay:ro
+      - ./certs:/opt/creatorhive-preview/certs:ro
+    depends_on: !override
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    cpus: 1
+    mem_limit: 1g
+  postgres:
+    profiles: [unused-local-database]
+  redis:
+    cpus: 0.25
+    mem_limit: 128m
+  minio:
+    cpus: 0.5
+    mem_limit: 512m

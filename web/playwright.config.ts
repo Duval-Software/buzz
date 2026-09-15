@@ -31,6 +31,7 @@ export default defineConfig({
         "**/accounts.spec.ts",
         "**/onboarding.spec.ts",
         "**/cloud-agents.spec.ts",
+        "**/ui-recovery.spec.ts",
       ],
       use: {
         ...devices["Desktop Chrome"],

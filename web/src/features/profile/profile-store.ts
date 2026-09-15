@@ -149,6 +149,15 @@ export async function publishDisplayName(
   selfPubkey: string,
   displayName: string,
 ): Promise<void> {
+  return publishProfile(selfPubkey, displayName);
+}
+
+/** Merge a member-selected photo without erasing other profile fields. */
+export async function publishProfile(
+  selfPubkey: string,
+  displayName: string,
+  picture?: string,
+): Promise<void> {
   const name = displayName.trim();
   if (!name || name.length > 60)
     throw new Error("Use a display name between 1 and 60 characters.");
@@ -172,6 +181,7 @@ export async function publishDisplayName(
   const content: Record<string, unknown> = {
     ...(existing?.raw ?? {}),
     display_name: name,
+    ...(picture === undefined ? {} : { picture }),
   };
   const event = await signNostrEvent({
     kind: 0,

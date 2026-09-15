@@ -76,6 +76,8 @@ enum Command {
     GenerateKey,
     /// Run pending database migrations.
     Migrate,
+    /// Ensure the next three months of event/delivery partitions (operator DDL role).
+    MaintainPartitions,
     /// Inspect deployment-wide Buzz product feedback.
     ProductFeedback {
         #[command(subcommand)]
@@ -134,6 +136,11 @@ async fn run(cli: Cli) -> Result<i32> {
             println!("Public key:  {}", keys.public_key().to_hex());
             println!("Secret key:  {}", keys.secret_key().display_secret());
             println!("\nSet BUZZ_PRIVATE_KEY to the secret key to use this identity.");
+            Ok(0)
+        }
+        Command::MaintainPartitions => {
+            connect_db().await?.ensure_future_partitions(3).await?;
+            println!("Partition maintenance complete.");
             Ok(0)
         }
         Command::Migrate => {

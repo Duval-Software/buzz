@@ -9,7 +9,7 @@
 //! |------|-----------------|----------------------|
 //! | 9030 | Add member      | admin or owner       |
 //! | 9031 | Remove member   | admin or owner       |
-//! | 9032 | Change role     | owner only           |
+//! | 9032 | Change role     | owner; admin for member/moderator changes |
 //! | 9033 | Set workspace profile (icon) | admin or owner; on an open relay whose community has no admin/owner row at all, any authenticated sender (see [`may_set_workspace_profile`]) |
 
 use std::sync::Arc;
@@ -420,56 +420,8 @@ async fn execute_relay_admin_command(
 
         // kind:9032 — Change relay member role
         k if k == RELAY_ADMIN_CHANGE_ROLE => {
-            // Only owners may change roles.
-            if sender_role != "owner" {
-                return Err("actor not authorized: must be owner".to_string());
-            }
-
-            // Cannot change your own role.
-            if target_hex == sender_hex {
-                return Err("cannot change your own role".to_string());
-            }
-
-            let new_role =
-                extract_tag_value(event, "role").ok_or_else(|| "missing role tag".to_string())?;
-
-            // DESIGN: Ownership transfer via kind:9032 is intentionally blocked.
-            // Transferring ownership is a high-risk operation that could permanently
-            // lock out the current owner. Use RELAY_OWNER_PUBKEY config to change ownership.
-            if new_role == "owner" {
-                return Err("cannot set role to owner".to_string());
-            }
-            if new_role != "admin" && new_role != "member" {
-                return Err(format!("invalid role: {new_role}"));
-            }
-
-            let updated = state
-                .db
-                .update_relay_member_role(tenant.community(), &target_hex, &new_role)
-                .await
-                .map_err(|e| format!("database error: {e}"))?;
-
-            if !updated {
-                // Distinguish "owner (protected)" from "doesn't exist"
-                let exists = state
-                    .db
-                    .get_relay_member(tenant.community(), &target_hex)
-                    .await
-                    .map_err(|e| format!("database error: {e}"))?;
-                return Err(if exists.is_some() {
-                    "cannot change the relay owner's role".to_string()
-                } else {
-                    format!("member not found: {target_hex}")
-                });
-            }
-
-            info!(
-                sender = %sender_hex,
-                target = %target_hex,
-                new_role = %new_role,
-                "relay member role changed"
-            );
-
+            crate::handlers::moderation_commands::handle_moderation_command(tenant, state, event)
+                .await?;
             if let Err(e) = publish_nip43_membership_list(tenant, state).await {
                 warn!(error = %e, "failed to publish NIP-43 membership list");
             }

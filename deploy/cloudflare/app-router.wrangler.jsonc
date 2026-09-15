@@ -1,0 +1,11 @@
+{
+  "name": "creatorhive-app-router",
+  "account_id": "fd9be900cda1c34edf565705c06364bd",
+  "main": "app-router.mjs",
+  "compatibility_date": "2026-09-14",
+  "workers_dev": false,
+  "preview_urls": false,
+  "vars": {
+    "FRONTEND_ORIGIN": "https://creatorhive-app-preview.pages.dev"
+  }
+}

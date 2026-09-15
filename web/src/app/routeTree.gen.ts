@@ -9,13 +9,17 @@ import { Route as workflowsRouteImport } from "./routes/workflows";
 import { Route as reposRouteImport } from "./routes/repos";
 import { Route as pulseRouteImport } from "./routes/pulse";
 import { Route as onboardingRouteImport } from "./routes/onboarding";
+import { Route as manageRouteImport } from "./routes/manage";
 import { Route as liveRouteImport } from "./routes/live";
 import { Route as inboxRouteImport } from "./routes/inbox";
 import { Route as communityRouteImport } from "./routes/community";
 import { Route as chatRouteImport } from "./routes/chat";
 import { Route as agentsRouteImport } from "./routes/agents";
+import { Route as accountModerationRouteImport } from "./routes/account-moderation";
+import { Route as profileRouteImport } from "./routes/profile";
 import { Route as indexRouteImport } from "./routes/index";
 import { Route as reposDotrepoIdRouteImport } from "./routes/repos.$repoId";
+import { Route as profileEditRouteImport } from "./routes/profile-edit";
 import { Route as inviteDotcodeRouteImport } from "./routes/invite.$code";
 import { Route as reposDotrepoIdDotblobDotsplatRouteImport } from "./routes/repos.$repoId.blob.$";
 
@@ -37,6 +41,11 @@ const pulseRoute = pulseRouteImport.update({
 const onboardingRoute = onboardingRouteImport.update({
   id: "/onboarding",
   path: "/onboarding",
+  getParentRoute: () => rootRouteImport,
+} as any);
+const manageRoute = manageRouteImport.update({
+  id: "/manage",
+  path: "/manage",
   getParentRoute: () => rootRouteImport,
 } as any);
 const liveRoute = liveRouteImport.update({
@@ -64,6 +73,16 @@ const agentsRoute = agentsRouteImport.update({
   path: "/agents",
   getParentRoute: () => rootRouteImport,
 } as any);
+const accountModerationRoute = accountModerationRouteImport.update({
+  id: "/account-moderation",
+  path: "/account-moderation",
+  getParentRoute: () => rootRouteImport,
+} as any);
+const profileRoute = profileRouteImport.update({
+  id: "/$profileHandle",
+  path: "/$profileHandle",
+  getParentRoute: () => rootRouteImport,
+} as any);
 const indexRoute = indexRouteImport.update({
   id: "/",
   path: "/",
@@ -72,6 +91,11 @@ const indexRoute = indexRouteImport.update({
 const reposDotrepoIdRoute = reposDotrepoIdRouteImport.update({
   id: "/repos/$repoId",
   path: "/repos/$repoId",
+  getParentRoute: () => rootRouteImport,
+} as any);
+const profileEditRoute = profileEditRouteImport.update({
+  id: "/profile/edit",
+  path: "/profile/edit",
   getParentRoute: () => rootRouteImport,
 } as any);
 const inviteDotcodeRoute = inviteDotcodeRouteImport.update({
@@ -88,47 +112,59 @@ const reposDotrepoIdDotblobDotsplatRoute =
 
 export interface FileRoutesByFullPath {
   "/": typeof indexRoute;
+  "/$profileHandle": typeof profileRoute;
+  "/account-moderation": typeof accountModerationRoute;
   "/agents": typeof agentsRoute;
   "/chat": typeof chatRoute;
   "/community": typeof communityRoute;
   "/inbox": typeof inboxRoute;
   "/live": typeof liveRoute;
+  "/manage": typeof manageRoute;
   "/onboarding": typeof onboardingRoute;
   "/pulse": typeof pulseRoute;
   "/repos": typeof reposRoute;
   "/workflows": typeof workflowsRoute;
   "/invite/$code": typeof inviteDotcodeRoute;
+  "/profile/edit": typeof profileEditRoute;
   "/repos/$repoId": typeof reposDotrepoIdRoute;
   "/repos/$repoId/blob/$": typeof reposDotrepoIdDotblobDotsplatRoute;
 }
 export interface FileRoutesByTo {
   "/": typeof indexRoute;
+  "/$profileHandle": typeof profileRoute;
+  "/account-moderation": typeof accountModerationRoute;
   "/agents": typeof agentsRoute;
   "/chat": typeof chatRoute;
   "/community": typeof communityRoute;
   "/inbox": typeof inboxRoute;
   "/live": typeof liveRoute;
+  "/manage": typeof manageRoute;
   "/onboarding": typeof onboardingRoute;
   "/pulse": typeof pulseRoute;
   "/repos": typeof reposRoute;
   "/workflows": typeof workflowsRoute;
   "/invite/$code": typeof inviteDotcodeRoute;
+  "/profile/edit": typeof profileEditRoute;
   "/repos/$repoId": typeof reposDotrepoIdRoute;
   "/repos/$repoId/blob/$": typeof reposDotrepoIdDotblobDotsplatRoute;
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport;
   "/": typeof indexRoute;
+  "/$profileHandle": typeof profileRoute;
+  "/account-moderation": typeof accountModerationRoute;
   "/agents": typeof agentsRoute;
   "/chat": typeof chatRoute;
   "/community": typeof communityRoute;
   "/inbox": typeof inboxRoute;
   "/live": typeof liveRoute;
+  "/manage": typeof manageRoute;
   "/onboarding": typeof onboardingRoute;
   "/pulse": typeof pulseRoute;
   "/repos": typeof reposRoute;
   "/workflows": typeof workflowsRoute;
   "/invite/$code": typeof inviteDotcodeRoute;
+  "/profile/edit": typeof profileEditRoute;
   "/repos/$repoId": typeof reposDotrepoIdRoute;
   "/repos/$repoId/blob/$": typeof reposDotrepoIdDotblobDotsplatRoute;
 }
@@ -136,62 +172,78 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath;
   fullPaths:
     | "/"
+    | "/$profileHandle"
+    | "/account-moderation"
     | "/agents"
     | "/chat"
     | "/community"
     | "/inbox"
     | "/live"
+    | "/manage"
     | "/onboarding"
     | "/pulse"
     | "/repos"
     | "/workflows"
     | "/invite/$code"
+    | "/profile/edit"
     | "/repos/$repoId"
     | "/repos/$repoId/blob/$";
   fileRoutesByTo: FileRoutesByTo;
   to:
     | "/"
+    | "/$profileHandle"
+    | "/account-moderation"
     | "/agents"
     | "/chat"
     | "/community"
     | "/inbox"
     | "/live"
+    | "/manage"
     | "/onboarding"
     | "/pulse"
     | "/repos"
     | "/workflows"
     | "/invite/$code"
+    | "/profile/edit"
     | "/repos/$repoId"
     | "/repos/$repoId/blob/$";
   id:
     | "__root__"
     | "/"
+    | "/$profileHandle"
+    | "/account-moderation"
     | "/agents"
     | "/chat"
     | "/community"
     | "/inbox"
     | "/live"
+    | "/manage"
     | "/onboarding"
     | "/pulse"
     | "/repos"
     | "/workflows"
     | "/invite/$code"
+    | "/profile/edit"
     | "/repos/$repoId"
     | "/repos/$repoId/blob/$";
   fileRoutesById: FileRoutesById;
 }
 export interface RootRouteChildren {
   indexRoute: typeof indexRoute;
+  profileRoute: typeof profileRoute;
+  accountModerationRoute: typeof accountModerationRoute;
   agentsRoute: typeof agentsRoute;
   chatRoute: typeof chatRoute;
   communityRoute: typeof communityRoute;
   inboxRoute: typeof inboxRoute;
   liveRoute: typeof liveRoute;
+  manageRoute: typeof manageRoute;
   onboardingRoute: typeof onboardingRoute;
   pulseRoute: typeof pulseRoute;
   reposRoute: typeof reposRoute;
   workflowsRoute: typeof workflowsRoute;
   inviteDotcodeRoute: typeof inviteDotcodeRoute;
+  profileEditRoute: typeof profileEditRoute;
   reposDotrepoIdRoute: typeof reposDotrepoIdRoute;
   reposDotrepoIdDotblobDotsplatRoute: typeof reposDotrepoIdDotblobDotsplatRoute;
 }
@@ -224,6 +276,13 @@ declare module "@tanstack/react-router" {
       path: "/onboarding";
       fullPath: "/onboarding";
       preLoaderRoute: typeof onboardingRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/manage": {
+      id: "/manage";
+      path: "/manage";
+      fullPath: "/manage";
+      preLoaderRoute: typeof manageRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     "/live": {
@@ -261,6 +320,20 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof agentsRouteImport;
       parentRoute: typeof rootRouteImport;
     };
+    "/account-moderation": {
+      id: "/account-moderation";
+      path: "/account-moderation";
+      fullPath: "/account-moderation";
+      preLoaderRoute: typeof accountModerationRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/$profileHandle": {
+      id: "/$profileHandle";
+      path: "/$profileHandle";
+      fullPath: "/$profileHandle";
+      preLoaderRoute: typeof profileRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     "/": {
       id: "/";
       path: "/";
@@ -273,6 +346,13 @@ declare module "@tanstack/react-router" {
       path: "/repos/$repoId";
       fullPath: "/repos/$repoId";
       preLoaderRoute: typeof reposDotrepoIdRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/profile/edit": {
+      id: "/profile/edit";
+      path: "/profile/edit";
+      fullPath: "/profile/edit";
+      preLoaderRoute: typeof profileEditRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     "/invite/$code": {
@@ -294,16 +374,20 @@ declare module "@tanstack/react-router" {
 
 const rootRouteChildren: RootRouteChildren = {
   indexRoute: indexRoute,
+  profileRoute: profileRoute,
+  accountModerationRoute: accountModerationRoute,
   agentsRoute: agentsRoute,
   chatRoute: chatRoute,
   communityRoute: communityRoute,
   inboxRoute: inboxRoute,
   liveRoute: liveRoute,
+  manageRoute: manageRoute,
   onboardingRoute: onboardingRoute,
   pulseRoute: pulseRoute,
   reposRoute: reposRoute,
   workflowsRoute: workflowsRoute,
   inviteDotcodeRoute: inviteDotcodeRoute,
+  profileEditRoute: profileEditRoute,
   reposDotrepoIdRoute: reposDotrepoIdRoute,
   reposDotrepoIdDotblobDotsplatRoute: reposDotrepoIdDotblobDotsplatRoute,
 };

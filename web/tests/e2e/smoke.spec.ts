@@ -16,9 +16,7 @@ test("home page opens the community for existing members", async ({ page }) => {
   await installCommunityFixture(page);
   await page.goto("/");
   await expect(page).toHaveURL("/chat");
-  await expect(
-    page.getByRole("button", { name: /Your profile/ }),
-  ).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Account/ })).toBeVisible();
 });
 
 test("invite requires age and legal consent before opening Buzz", async ({

@@ -105,7 +105,7 @@ impl Db {
         pubkey: &str,
         token_hash: Option<&str>,
     ) -> Result<bool> {
-        Ok(sqlx::query_scalar("SELECT NOT EXISTS (SELECT 1 FROM community_accounts WHERE community_id=$1 AND pubkey=$2) OR EXISTS (SELECT 1 FROM account_sessions WHERE community_id=$1 AND pubkey=$2 AND token_hash=$3 AND expires_at>now())")
+        Ok(sqlx::query_scalar("SELECT CASE WHEN EXISTS (SELECT 1 FROM managed_accounts WHERE community_id=$1 AND pubkey=$2) THEN EXISTS (SELECT 1 FROM managed_sessions s JOIN managed_accounts a USING (community_id,pubkey) WHERE s.community_id=$1 AND s.pubkey=$2 AND s.token_hash=$3 AND s.expires_at>now() AND managed_auth_session_active(a.account_id,s.auth_session_id)) ELSE NOT EXISTS (SELECT 1 FROM community_accounts WHERE community_id=$1 AND pubkey=$2) OR EXISTS (SELECT 1 FROM account_sessions WHERE community_id=$1 AND pubkey=$2 AND token_hash=$3 AND expires_at>now()) END")
             .bind(community.as_uuid()).bind(pubkey).bind(token_hash).fetch_one(&self.pool).await?)
     }
 

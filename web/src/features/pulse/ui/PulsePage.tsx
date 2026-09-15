@@ -1,3 +1,6 @@
+import { useSessionDraft } from "@/shared/lib/use-session-draft";
+import { useNavigate, useSearch } from "@tanstack/react-router";
+import { ContentSkeleton } from "@/shared/ui/ContentSkeleton";
 import { Activity, ArrowUpRight, Check, Paperclip, Plus } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { contentWithoutMediaLines } from "@/features/chat/message-media";
@@ -68,6 +71,8 @@ function NoteCard({
   const isFollowing = followed.includes(buildKey(note));
   return (
     <article
+      data-update-id={note.id}
+      tabIndex={-1}
       className={`hive-note pulse-note ${depth > 0 ? "pulse-reply" : ""}`}
       aria-label={`Update by ${names(note.pubkey)}`}
     >
@@ -192,11 +197,35 @@ function NoteCard({
 export function PulsePage() {
   const { identity } = useMembership();
   const self = identity?.pubkey.toLowerCase() ?? "";
-  const api = usePulse(self);
+  const search = useSearch({ from: "/pulse" });
+  const navigate = useNavigate();
+  const api = usePulse(self, search.update);
+  const focusedUpdate = useRef<string | null>(null);
+  useEffect(() => {
+    if (!search.update) {
+      focusedUpdate.current = null;
+      return;
+    }
+    if (
+      api.targetLoading ||
+      api.targetError ||
+      !api.notes.some((note) => note.id === search.update) ||
+      focusedUpdate.current === search.update
+    )
+      return;
+    const element = document.querySelector<HTMLElement>(
+      `[data-update-id="${CSS.escape(search.update)}"]`,
+    );
+    if (element) {
+      element.scrollIntoView({ block: "center", behavior: "instant" });
+      element.focus({ preventScroll: true });
+      focusedUpdate.current = search.update;
+    }
+  }, [search.update, api.targetLoading, api.targetError, api.notes]);
   const names = useNames();
   const [composing, setComposing] = useState(false);
   const [followingOnly, setFollowingOnly] = useState(false);
-  const [draft, setDraft] = useState("");
+  const [draft, setDraft] = useSessionDraft(self, "pulse");
   const [postType, setPostType] = useState<PostType>("progress");
   const [project, setProject] = useState("");
   const [projectUrl, setProjectUrl] = useState("");
@@ -267,13 +296,15 @@ export function PulsePage() {
       list.sort((a, b) => a.createdAt - b.createdAt);
     return { roots: tops, replies: byParent };
   }, [api.notes]);
-  const visible = roots.filter(
-    (note) =>
-      (!followingOnly || followed.includes(buildKey(note))) &&
-      (filter === "all" ||
-        (note.postType === filter &&
-          (filter !== "feedback" || !note.resolved))),
-  );
+  const visible = search.update
+    ? api.notes.filter((note) => note.id === search.update)
+    : roots.filter(
+        (note) =>
+          (!followingOnly || followed.includes(buildKey(note))) &&
+          (filter === "all" ||
+            (note.postType === filter &&
+              (filter !== "feedback" || !note.resolved))),
+      );
   async function post() {
     if (busy || uploading) return;
     setBusy(true);
@@ -457,6 +488,7 @@ export function PulsePage() {
               )}
               <textarea
                 ref={textarea}
+                data-dialog-autofocus
                 disabled={busy}
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
@@ -591,20 +623,42 @@ export function PulsePage() {
             {notice}
           </p>
         )}
-        {api.loading && api.notes.length === 0 ? (
-          <p className="pulse-help">Loading updates…</p>
+        {search.update && (
+          <p className="pulse-help">
+            <button
+              type="button"
+              onClick={() => void navigate({ to: "/pulse", search: {} })}
+            >
+              ← Back to all updates
+            </button>
+          </p>
+        )}
+        {api.targetError && (
+          <p className="pulse-help" role="alert">
+            {api.targetError}{" "}
+            <button type="button" onClick={api.retryTarget}>
+              Retry
+            </button>
+          </p>
+        )}
+        {api.targetLoading || (api.loading && api.notes.length === 0) ? (
+          <ContentSkeleton feed />
         ) : visible.length === 0 ? (
           <div className="hive-empty">
             <Activity aria-hidden="true" />
             <h3>
-              {followingOnly
-                ? "Keep up with a build."
-                : "The next update could be yours."}
+              {search.update
+                ? "Update unavailable."
+                : followingOnly
+                  ? "Keep up with a build."
+                  : "The next update could be yours."}
             </h3>
             <p>
-              {followingOnly
-                ? "Follow a linked build from Latest to see its updates here."
-                : "Share progress, show what shipped, or ask for a second pair of eyes."}
+              {search.update
+                ? "Return to all updates to keep exploring."
+                : followingOnly
+                  ? "Follow a linked build from Latest to see its updates here."
+                  : "Share progress, show what shipped, or ask for a second pair of eyes."}
             </p>
           </div>
         ) : (

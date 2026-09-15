@@ -1,3 +1,4 @@
+import { useLocalMedia } from "../use-local-media";
 import {
   type LocalTrackPublication,
   type RemoteParticipant,
@@ -41,10 +42,14 @@ export function VideoPanel({
   const [room, setRoom] = useState<Room | null>(null);
   const [status, setStatus] = useState<"idle" | "joining" | "live">("idle");
   const [error, setError] = useState<string | null>(null);
+  const {
+    camera: camOn,
+    microphone: micOn,
+    screen: screenOn,
+    pending: devicePending,
+    toggle: toggleDevice,
+  } = useLocalMedia(room, setError);
   const [tiles, setTiles] = useState<Tile[]>([]);
-  const [camOn, setCamOn] = useState(false);
-  const [micOn, setMicOn] = useState(false);
-  const [screenOn, setScreenOn] = useState(false);
   const stageRef = useRef<HTMLDivElement>(null);
 
   const attach = useCallback(
@@ -77,9 +82,6 @@ export function VideoPanel({
     setRoom(null);
     setTiles([]);
     setStatus("idle");
-    setCamOn(false);
-    setMicOn(false);
-    setScreenOn(false);
   }, [room]);
 
   const join = useCallback(async () => {
@@ -169,35 +171,6 @@ export function VideoPanel({
     }
   }, [tiles]);
 
-  async function toggleCam() {
-    if (!room) {
-      return;
-    }
-    const next = !camOn;
-    await room.localParticipant.setCameraEnabled(next);
-    await room.localParticipant.setMicrophoneEnabled(next);
-    setCamOn(next);
-    setMicOn(next);
-  }
-
-  async function toggleScreen() {
-    if (!room) {
-      return;
-    }
-    const next = !screenOn;
-    await room.localParticipant.setScreenShareEnabled(next);
-    setScreenOn(next);
-  }
-
-  async function toggleMic() {
-    if (!room) {
-      return;
-    }
-    const next = !micOn;
-    await room.localParticipant.setMicrophoneEnabled(next);
-    setMicOn(next);
-  }
-
   const videoTiles = tiles.filter((t) => t.element instanceof HTMLVideoElement);
 
   return (
@@ -216,7 +189,10 @@ export function VideoPanel({
           <>
             <button
               type="button"
-              onClick={toggleCam}
+              onClick={() => void toggleDevice("camera")}
+              disabled={!!devicePending || status !== "live"}
+              aria-pressed={camOn}
+              aria-busy={devicePending === "camera"}
               className={cn(
                 "rounded-lg border px-3 py-1.5 text-sm",
                 camOn
@@ -224,11 +200,14 @@ export function VideoPanel({
                   : "border-neutral-700 text-neutral-300",
               )}
             >
-              {camOn ? "Camera on" : "Camera + mic"}
+              {camOn ? "Camera on" : "Camera"}
             </button>
             <button
               type="button"
-              onClick={toggleMic}
+              onClick={() => void toggleDevice("microphone")}
+              disabled={!!devicePending || status !== "live"}
+              aria-pressed={micOn}
+              aria-busy={devicePending === "microphone"}
               className={cn(
                 "rounded-lg border px-3 py-1.5 text-sm",
                 micOn
@@ -240,7 +219,10 @@ export function VideoPanel({
             </button>
             <button
               type="button"
-              onClick={toggleScreen}
+              onClick={() => void toggleDevice("screen")}
+              disabled={!!devicePending || status !== "live"}
+              aria-pressed={screenOn}
+              aria-busy={devicePending === "screen"}
               className={cn(
                 "rounded-lg border px-3 py-1.5 text-sm",
                 screenOn

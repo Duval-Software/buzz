@@ -335,6 +335,15 @@ pub async fn validate_admin_event(
         return Err(anyhow::anyhow!("channel is archived"));
     }
 
+    let community_role = state
+        .db
+        .get_relay_member(tenant.community(), &event.pubkey.to_hex())
+        .await?
+        .map(|member| member.role);
+    let community_admin = matches!(community_role.as_deref(), Some("owner" | "admin"));
+    if matches!(kind, 9001 | 9005) && community_role.as_deref() == Some("moderator") {
+        anyhow::bail!("Use the report review commands to moderate content");
+    }
     match kind {
         9000 => {
             // An absent role tag means "no role change requested": for an existing
@@ -528,7 +537,7 @@ pub async fn validate_admin_event(
             }
             // Publishing settings and announcement headers require an actual channel role.
             // Agent ownership and community administration do not grant channel publishing rights.
-            if !policies.is_empty() || channel.posting_policy == "admins" {
+            if (!policies.is_empty() || channel.posting_policy == "admins") && !community_admin {
                 let members = state.db.get_members(tenant.community(), channel_id).await?;
                 if !members.iter().any(|m| {
                     m.pubkey == actor_bytes && matches!(m.role.as_str(), "owner" | "admin")
@@ -626,6 +635,9 @@ pub async fn validate_admin_event(
                     || k == "posting_policy"
             });
             if has_privileged_tag {
+                if community_admin {
+                    return Ok(());
+                }
                 let members = state.db.get_members(tenant.community(), channel_id).await?;
                 let actor_member = members.iter().find(|m| m.pubkey == actor_bytes);
                 match actor_member {

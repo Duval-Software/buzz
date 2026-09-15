@@ -57,6 +57,30 @@ pub async fn handle_report_event(
                 .await
                 .map_err(|e| format!("error: database error resolving report target: {e}"))?
                 .ok_or_else(|| "invalid: report target event not found".to_string())?;
+            if !buzz_core::filter::reader_authorized_for_event(
+                &stored.event,
+                &event.pubkey.to_hex(),
+            ) {
+                return Err("restricted: report target is not accessible".into());
+            }
+            if let Some(channel) = stored.channel_id {
+                let record = state
+                    .db
+                    .get_channel(tenant.community(), channel)
+                    .await
+                    .map_err(|_| "error: channel unavailable".to_string())?;
+                if record.visibility != "open"
+                    && !state
+                        .db
+                        .get_members(tenant.community(), channel)
+                        .await
+                        .map_err(|_| "error: channel unavailable".to_string())?
+                        .iter()
+                        .any(|member| member.pubkey == reporter_pubkey)
+                {
+                    return Err("restricted: report target is not accessible".into());
+                }
+            }
             (ReportTarget::Event(event_id), stored.channel_id)
         }
         ParsedReportTarget::Blob { sha256, .. } => {

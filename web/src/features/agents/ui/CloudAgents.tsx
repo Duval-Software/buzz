@@ -17,6 +17,9 @@ import {
 } from "@/features/agents/keeper";
 import { AvatarDisc } from "@/features/profile/ui/AvatarDisc";
 import { cn } from "@/shared/lib/cn";
+import { managedAccountsEnabled } from "@/shared/lib/supabase";
+import { useNavigate } from "@tanstack/react-router";
+import { openDm } from "@/features/dm/open-dm";
 
 /**
  * The cloud tier: agents that live on CreatorHive's servers and never sleep.
@@ -27,6 +30,7 @@ import { cn } from "@/shared/lib/cn";
  * rest there, and never stored in the browser.
  */
 export function CloudAgents() {
+  const navigate = useNavigate();
   const [models, setModels] = useState<CloudModel[]>(legacyCloudModels);
   const [agents, setAgents] = useState<CloudAgent[] | null>(null);
   const [unavailable, setUnavailable] = useState(false);
@@ -284,13 +288,17 @@ export function CloudAgents() {
             >
               {busy ? "…" : adopting ? "Promote to cloud" : "Create"}
             </button>
-            <button
-              type="button"
-              onClick={() => setAdopting((a) => !a)}
-              className="rounded-lg border border-neutral-700 px-3 py-1.5 text-neutral-300 text-xs"
-            >
-              {adopting ? "Mint a new key instead" : "Promote a desktop agent…"}
-            </button>
+            {!managedAccountsEnabled && (
+              <button
+                type="button"
+                onClick={() => setAdopting((a) => !a)}
+                className="rounded-lg border border-neutral-700 px-3 py-1.5 text-neutral-300 text-xs"
+              >
+                {adopting
+                  ? "Mint a new key instead"
+                  : "Promote a desktop agent…"}
+              </button>
+            )}
           </div>
           {adopting ? (
             <div className="mt-2">
@@ -331,8 +339,7 @@ export function CloudAgents() {
 
       {agents !== null && agents.length === 0 && !creating && !unavailable ? (
         <p className="px-4 py-2 text-neutral-600 text-sm">
-          You haven’t created a cloud agent yet. Create one or bring an existing
-          desktop agent to CreatorHive’s servers.
+          You haven’t created a cloud agent yet. Create one to get started.
         </p>
       ) : null}
 
@@ -358,6 +365,19 @@ export function CloudAgents() {
                 : ""}
             </span>
             <span className="ml-auto flex gap-1.5">
+              <button
+                type="button"
+                disabled={busy || agent.paused}
+                onClick={() =>
+                  void act(async () => {
+                    const channel = await openDm([agent.pubkey]);
+                    await navigate({ to: "/chat", search: { channel } });
+                  })
+                }
+                className="rounded-lg border border-neutral-700 px-2 py-1 text-neutral-300 text-xs disabled:opacity-40"
+              >
+                Message
+              </button>
               <button
                 type="button"
                 disabled={busy}

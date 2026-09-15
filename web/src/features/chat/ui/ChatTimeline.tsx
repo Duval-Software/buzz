@@ -1,10 +1,10 @@
+import { ProfilePreview } from "@/features/profile/ui/ProfilePreview";
 import { Fragment, useMemo } from "react";
 import type { ChatMessage } from "@/features/chat/use-chat";
 import type { ReactionMap } from "@/features/chat/use-reactions";
 import type { PresenceStatus } from "@/features/chat/use-presence";
 import { topLevelOnly } from "@/features/chat/use-threads";
 import { AvatarDisc } from "@/features/profile/ui/AvatarDisc";
-import { PresenceDot } from "./PresenceDot";
 import { MessageRow } from "./MessageRow";
 import { useNames } from "@/features/profile/use-profiles";
 
@@ -98,15 +98,20 @@ export function ChatTimeline({
           )}
           <article className="hive-message-group">
             <div className="hive-message-meta flex items-center gap-2">
-              <AvatarDisc
+              <ProfilePreview
                 pubkey={group[0].pubkey}
                 name={names(group[0].pubkey)}
-                size={30}
-              />
-              <span className="flex items-center gap-1.5 font-semibold text-sm">
-                <PresenceDot status={statusOf(group[0].pubkey)} />
-                {names(group[0].pubkey)}
-              </span>
+                status={statusOf(group[0].pubkey)}
+              >
+                <AvatarDisc
+                  pubkey={group[0].pubkey}
+                  name={names(group[0].pubkey)}
+                  size={30}
+                />
+                <span className="flex items-center gap-1.5 font-semibold text-sm">
+                  {names(group[0].pubkey)}
+                </span>
+              </ProfilePreview>
               <time className="text-neutral-500 text-xs">
                 {timeOf(group[0].createdAt)}
               </time>

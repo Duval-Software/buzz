@@ -28,6 +28,7 @@ pub mod event;
 pub mod feed;
 /// Git repository name registry (NIP-34 kind:30617).
 pub mod git_repo;
+pub mod managed_account;
 /// Embedded database migrations.
 pub mod migration;
 /// Community moderation: reports, bans/timeouts, audit actions.
@@ -8584,3 +8585,8 @@ mod tests {
         drop_scratch_db(&admin, pool, &name).await;
     }
 }
+
+/// Community staff operations and private moderation views.
+pub mod staff;
+
+pub mod public_profile;

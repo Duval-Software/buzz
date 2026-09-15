@@ -6,6 +6,7 @@ import {
   POSTING_POLICY_EXTENSION,
   publishCommunityCommand,
   useRelayInfo,
+  useCommunityMembers,
 } from "./community-access";
 
 /** Existing channel metadata command; only offered when this relay enforces the policy. */
@@ -18,6 +19,10 @@ export function ChannelPublishing({
 }) {
   const info = useRelayInfo();
   const { identity } = useMembership();
+  const roster = useCommunityMembers();
+  const communityRole = roster.data?.find(
+    (member) => member.pubkey === identity?.pubkey,
+  )?.role;
   const role = members.find(
     (member) => member.pubkey === identity?.pubkey,
   )?.role;
@@ -27,7 +32,13 @@ export function ChannelPublishing({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [accepted, setAccepted] = useState(false);
-  if (channel.kind === "dm" || (role !== "owner" && role !== "admin"))
+  if (
+    channel.kind === "dm" ||
+    (role !== "owner" &&
+      role !== "admin" &&
+      communityRole !== "owner" &&
+      communityRole !== "admin")
+  )
     return null;
   return (
     <details className="hive-channel-publishing">

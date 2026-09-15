@@ -364,11 +364,15 @@ export class NostrSocket {
    * refuses REQs from unauthenticated sockets.
    */
   queryOnce(filters: NostrFilter[], timeoutMs = 10_000): Promise<NostrEvent[]> {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const events: NostrEvent[] = [];
       const timer = setTimeout(() => {
         unsubscribe();
-        resolve(events);
+        reject(
+          new Error(
+            "The request timed out. Check your connection and try again.",
+          ),
+        );
       }, timeoutMs);
       const unsubscribe = this.subscribe(filters, {
         onEvent: (event) => events.push(event),
@@ -380,7 +384,11 @@ export class NostrSocket {
         onClosed: () => {
           clearTimeout(timer);
           unsubscribe();
-          resolve(events);
+          reject(
+            new Error(
+              "This request could not be completed. Check your access and try again.",
+            ),
+          );
         },
       });
     });

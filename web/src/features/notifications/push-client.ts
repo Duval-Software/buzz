@@ -50,8 +50,7 @@ export function pushSupported(): boolean {
     typeof window !== "undefined" &&
     "serviceWorker" in navigator &&
     "PushManager" in window &&
-    "Notification" in window &&
-    vapidPublicKey() !== null
+    "Notification" in window
   );
 }
 
@@ -112,9 +111,17 @@ export async function registerServiceWorker(): Promise<ServiceWorkerRegistration
   }
 }
 
-export type PushStatus = "unsupported" | "denied" | "off" | "on";
+export type PushStatus =
+  | "unconfigured"
+  | "install"
+  | "unsupported"
+  | "denied"
+  | "off"
+  | "on";
 
 export async function currentPushStatus(): Promise<PushStatus> {
+  if (!vapidPublicKey()) return "unconfigured";
+  if (needsHomeScreenInstall()) return "install";
   if (!pushSupported()) {
     return "unsupported";
   }

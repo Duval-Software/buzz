@@ -36,7 +36,10 @@ export function isRelayMediaUrl(raw: string): boolean {
     const url = new URL(raw);
     const relay = new URL(relayHttpBaseUrl());
     return (
-      url.protocol === "https:" &&
+      (url.protocol === "https:" ||
+        (import.meta.env.DEV &&
+          url.protocol === "http:" &&
+          relay.hostname === "localhost")) &&
       url.host === relay.host &&
       url.search === "" &&
       url.hash === "" &&

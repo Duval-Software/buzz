@@ -1,3 +1,4 @@
+import { useSessionDraft } from "@/shared/lib/use-session-draft";
 import { useEffect, useRef, useState } from "react";
 import type { ChatMessage } from "@/features/chat/use-chat";
 import { PresenceDot } from "@/features/chat/ui/PresenceDot";
@@ -34,6 +35,7 @@ export function ThreadPanel({
   statusOf,
   onClose,
   onSend,
+  targetId,
 }: {
   canPublish?: boolean;
   thread: Thread;
@@ -41,15 +43,20 @@ export function ThreadPanel({
   statusOf: (pubkey: string) => PresenceStatus;
   onClose: () => void;
   onSend: (text: string, target: ChatMessage) => Promise<void>;
+  targetId?: string;
 }) {
   const names = useNames();
-  const [draft, setDraft] = useState("");
+  const [draft, setDraft] = useSessionDraft(
+    selfPubkey,
+    `thread:${thread.root.id}`,
+  );
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const lastReplyId = thread.replies[thread.replies.length - 1]?.id;
 
   useEffect(() => {
+    if (targetId) return;
     // Jump straight to the bottom when the panel opens, and glide for replies
     // that arrive while it is open — animating the initial position just looks
     // like the panel is still loading.
@@ -60,7 +67,7 @@ export function ThreadPanel({
           ? "smooth"
           : "auto",
     });
-  }, [lastReplyId]);
+  }, [lastReplyId, targetId]);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -68,7 +75,6 @@ export function ThreadPanel({
     if (!text || sending) {
       return;
     }
-    setDraft("");
     setError(null);
     setSending(true);
     try {
@@ -77,9 +83,9 @@ export function ThreadPanel({
       // root tag keeps everything in one thread either way.
       const target = thread.replies[thread.replies.length - 1] ?? thread.root;
       await onSend(text, target);
+      setDraft("");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "could not send");
-      setDraft(text);
     } finally {
       setSending(false);
     }
@@ -121,7 +127,12 @@ export function ThreadPanel({
         </article>
 
         {thread.replies.map((reply) => (
-          <article key={reply.id} className="mt-3">
+          <article
+            key={reply.id}
+            data-message-id={reply.id}
+            tabIndex={-1}
+            className="mt-3"
+          >
             <div className="mb-1 flex items-baseline gap-2">
               <span className="flex items-center gap-1.5 font-semibold text-sm">
                 <PresenceDot status={statusOf(reply.pubkey)} />
@@ -153,7 +164,20 @@ export function ThreadPanel({
         >
           {error ? <p className="mb-2 text-red-400 text-sm">{error}</p> : null}
           <div className="flex items-center gap-2">
-            <input
+            <textarea
+              rows={1}
+              onKeyDown={(event) => {
+                if (
+                  event.key === "Enter" &&
+                  !event.shiftKey &&
+                  !event.nativeEvent.isComposing
+                ) {
+                  event.preventDefault();
+                  event.currentTarget.form?.requestSubmit();
+                }
+              }}
+              readOnly={sending}
+              aria-busy={sending}
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
               aria-label="Reply in thread"

@@ -561,7 +561,17 @@ mod tests {
         let mut migrations: Vec<_> = MIGRATOR.iter().collect();
         migrations.sort_by_key(|migration| migration.version);
 
-        assert_eq!(migrations.len(), 30);
+        assert!(migrations.len() >= 32);
+        assert_eq!(migrations[31].version, 32);
+        assert!(migrations[31]
+            .sql
+            .as_str()
+            .contains("CREATE TABLE moderation_appeals"));
+        assert_eq!(migrations[30].version, 31);
+        assert!(migrations[30]
+            .sql
+            .as_str()
+            .contains("CREATE TABLE managed_accounts"));
         assert_eq!(migrations[29].version, 30);
         assert_eq!(migrations[28].version, 29);
         assert!(migrations[28]

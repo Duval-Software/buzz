@@ -1,3 +1,5 @@
+import { ProfileEditButton } from "@/features/profile/ui/ProfileEditButton";
+import { ConnectedApps } from "./ConnectedApps";
 import { UserRound } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { CredentialForm } from "./CredentialForm";
@@ -52,6 +54,11 @@ export function IdentityPanel({
     >
       <div className="hive-identity">
         <div className="hive-profile-intro">
+          {identity.managed && (
+            <ProfileEditButton className="block text-amber-400 underline">
+              Edit public profile
+            </ProfileEditButton>
+          )}
           <Link
             to="/community"
             onClick={onClose}
@@ -104,39 +111,52 @@ export function IdentityPanel({
           ) : null}
         </div>
 
-        <section className="mt-5">
-          <h3 className="font-semibold">
-            {identity.username
-              ? `Signed in as @${identity.username}`
-              : "Give your profile a login"}
-          </h3>
-          <p className="hive-entry-note">
-            {identity.username
-              ? "Use your username and password on another device. Your community access stays the same."
-              : "Create a username and password for this profile. Your messages, memberships and roles stay with you."}
-          </p>
-          <details className="mt-3" open={!identity.username}>
-            <summary>
-              {identity.username ? "Change password" : "Create your login"}
-            </summary>
-            <CredentialForm
-              key={identity.username ?? "migrate"}
-              mode={identity.username ? "password" : "register"}
-              username={identity.username}
-              onSubmit={async (name, password, newPassword) => {
-                setAccessBusy(true);
-                try {
-                  if (identity.username)
-                    await changeAccountPassword(password, newPassword);
-                  else await registerAccount(name, password);
-                } finally {
-                  setAccessBusy(false);
-                }
-              }}
-            />
-          </details>
-        </section>
-        {!identity.username && (
+        {identity.managed ? (
+          <section className="mt-5">
+            <h3 className="font-semibold">
+              {identity.email ?? "Your CreatorHive account"}
+            </h3>
+            <p className="mt-2 text-neutral-400 text-sm">
+              Sign in with Google or email and password.
+            </p>
+            <a href="/account-moderation">Account restrictions and appeals</a>
+            <ConnectedApps />
+          </section>
+        ) : (
+          <section className="mt-5">
+            <h3 className="font-semibold">
+              {identity.username
+                ? `Signed in as @${identity.username}`
+                : "Give your profile a login"}
+            </h3>
+            <p className="hive-entry-note">
+              {identity.username
+                ? "Use your username and password on another device. Your community access stays the same."
+                : "Create a username and password for this profile. Your messages, memberships and roles stay with you."}
+            </p>
+            <details className="mt-3" open={!identity.username}>
+              <summary>
+                {identity.username ? "Change password" : "Create your login"}
+              </summary>
+              <CredentialForm
+                key={identity.username ?? "migrate"}
+                mode={identity.username ? "password" : "register"}
+                username={identity.username}
+                onSubmit={async (name, password, newPassword) => {
+                  setAccessBusy(true);
+                  try {
+                    if (identity.username)
+                      await changeAccountPassword(password, newPassword);
+                    else await registerAccount(name, password);
+                  } finally {
+                    setAccessBusy(false);
+                  }
+                }}
+              />
+            </details>
+          </section>
+        )}
+        {!identity.managed && !identity.username && (
           <details className="mt-5">
             <summary>Legacy account backup</summary>
             <div className="mt-4">
@@ -206,9 +226,11 @@ export function IdentityPanel({
           {confirmingSignOut ? (
             <div className="flex flex-col gap-2">
               <p className="text-neutral-300 text-sm">
-                {identity.username
-                  ? "Sign out of this browser? You can sign back in with your username and password."
-                  : "Create a login or save your legacy backup before signing out, so you can return to this profile."}
+                {identity.managed
+                  ? "Sign out of this browser? You can sign back in with your CreatorHive account."
+                  : identity.username
+                    ? "Sign out of this browser? You can sign back in with your username and password."
+                    : "Create a login or save your legacy backup before signing out, so you can return to this profile."}
               </p>
               <div className="flex gap-2">
                 <button

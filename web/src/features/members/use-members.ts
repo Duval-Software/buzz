@@ -20,7 +20,14 @@ const KIND_GROUP_MEMBERS = 39002;
 
 export type ChannelMember = {
   pubkey: string;
-  role: "owner" | "admin" | "member" | "guest" | "bot" | "unknown";
+  role:
+    | "moderator"
+    | "owner"
+    | "admin"
+    | "member"
+    | "guest"
+    | "bot"
+    | "unknown";
 };
 
 export function useMembers(channelId: string | null): ChannelMember[] {

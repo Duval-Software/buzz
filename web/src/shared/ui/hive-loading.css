@@ -1,0 +1,75 @@
+.hive-loading {
+  min-height: 100svh;
+  display: grid;
+  place-items: center;
+  padding: 2rem;
+  background:
+    radial-gradient(ellipse at 50% 43%, #edb95c09, transparent 55%), #141516;
+}
+.hive-loading-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+.hive-loading-emblem {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 10rem;
+  height: 11rem;
+  margin-bottom: 1.5rem;
+}
+.hive-loading-emblem img {
+  width: 6.4rem;
+  height: 6.4rem;
+  object-fit: contain;
+  animation: hive-loading-breathe 2.8s ease-in-out infinite;
+}
+.hive-loading-orbit {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  stroke-width: 1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.hive-loading-track {
+  stroke: #edb95c22;
+}
+.hive-loading-trace {
+  stroke: #edb95c;
+  stroke-dasharray: 12 88;
+  animation: hive-loading-orbit 4s linear infinite;
+}
+.hive-loading-wordmark {
+  font-size: 1.5rem;
+  font-weight: 650;
+  letter-spacing: -0.045em;
+  color: #f3f1ec;
+}
+.hive-loading-wordmark span {
+  font-weight: 400;
+}
+.hive-loading-content p {
+  margin-top: 0.6rem;
+  font-size: 0.75rem;
+  color: #aeb4b9;
+}
+@keyframes hive-loading-orbit {
+  to {
+    stroke-dashoffset: -100;
+  }
+}
+@keyframes hive-loading-breathe {
+  50% {
+    transform: translateY(-0.2rem);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hive-loading-emblem img,
+  .hive-loading-trace {
+    animation: none;
+  }
+}

@@ -46,6 +46,17 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .layer(RequestBodyLimitLayer::new(media_body_limit))
         .with_state(state.clone());
 
+    let profile_upload_router = Router::new()
+        .route(
+            "/api/identity/profile/image",
+            post(api::public_profiles::upload),
+        )
+        .layer(axum::extract::DefaultBodyLimit::max(5 * 1024 * 1024))
+        .layer(RequestBodyLimitLayer::new(5 * 1024 * 1024))
+        .layer(axum::middleware::map_response(
+            api::public_profiles::no_store,
+        ))
+        .with_state(state.clone());
     let git_router = api::git::git_router(state.clone());
 
     let git_policy_router = api::git::git_policy_router(state.clone());
@@ -91,6 +102,35 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route(
             "/operator/communities/transfer",
             post(api::operator::transfer_community),
+        )
+        .route(
+            "/api/identity/bootstrap",
+            post(api::managed_accounts::bootstrap),
+        )
+        .route("/api/identity/moderation/read", post(api::staff::read))
+        .route("/api/identity/moderation/appeal", post(api::staff::appeal))
+        .merge(
+            Router::new()
+                .route("/api/profiles/{username}", get(api::public_profiles::read))
+                .route("/api/profile-images/{id}", get(api::public_profiles::image))
+                .route("/api/identity/profile/own", post(api::public_profiles::own))
+                .route(
+                    "/api/identity/profile/save",
+                    post(api::public_profiles::save),
+                )
+                .route(
+                    "/api/identity/profile/search",
+                    post(api::public_profiles::search),
+                )
+                .layer(axum::middleware::map_response(
+                    api::public_profiles::no_store,
+                )),
+        )
+        .route("/api/identity/sign", post(api::managed_accounts::sign))
+        .route("/api/identity/logout", post(api::managed_accounts::logout))
+        .route(
+            "/api/identity/session",
+            post(api::managed_accounts::service_session),
         )
         // Credential exchange is HTTP-only: passwords must never enter the event log.
         .route("/api/accounts/register", post(api::accounts::register))
@@ -144,6 +184,7 @@ pub fn build_router(state: Arc<AppState>) -> Router {
     // Metrics → Trace → CORS applied once over the combined router.
     let mut merged = api_router
         .merge(media_router)
+        .merge(profile_upload_router)
         .merge(git_router)
         .merge(git_policy_router);
     if let Some(admin_router) = admin_router {

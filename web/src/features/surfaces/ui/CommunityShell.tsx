@@ -1,3 +1,4 @@
+import { useCommunityMembers } from "@/features/community/community-access";
 import {
   Menu,
   Megaphone,
@@ -8,7 +9,14 @@ import {
   ChevronDown,
   Pin,
 } from "lucide-react";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   type Channel,
@@ -27,7 +35,6 @@ import { LiveRooms } from "@/features/video/ui/LiveRooms";
 import { stageBaseUrl } from "@/features/video/stage-client";
 import { ThemeToggle } from "@/shared/theme/ThemeToggle";
 import { relayWsUrl } from "@/shared/lib/relay-url";
-import { CommunityDialog } from "./CommunityDialog";
 import { cn } from "@/shared/lib/cn";
 import { HiveBrand, SurfacesNav } from "./SurfacesNav";
 import "./community-shell.css";
@@ -65,7 +72,7 @@ export function CommunityShell({
   announcementsOpen?: boolean;
   activeRoom?: string | null;
   onOpenRoom?: (room: string) => void;
-  onSelectChannel?: (id: string) => void;
+  onSelectChannel?: (id: string, eventId?: string) => void;
   children: (controls: {
     openChannels: () => void;
     openSearch: () => void;
@@ -74,6 +81,10 @@ export function CommunityShell({
   }) => ReactNode;
 }) {
   const { identity, signOut } = useMembership();
+  const roster = useCommunityMembers();
+  const staffRole = roster.data?.find(
+    (member) => member.pubkey === identity?.pubkey,
+  )?.role;
   const { error: channelsError, retry: retryChannels } = useChannels();
   const pubkey = identity?.pubkey ?? "";
   const names = useNames();
@@ -85,8 +96,6 @@ export function CommunityShell({
     pinned: string[];
     last?: string;
   }>({ key: "", pinned: [] });
-  const [browseOpen, setBrowseOpen] = useState(false);
-  const [channelFilter, setChannelFilter] = useState("");
   useEffect(() => {
     try {
       const saved = JSON.parse(localStorage.getItem(preferenceKey) ?? "{}");
@@ -110,6 +119,24 @@ export function CommunityShell({
     }
   }, [preferenceKey, preferences]);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const drawer = useRef<HTMLDialogElement>(null);
+  const [mobile, setMobile] = useState(
+    () => window.matchMedia("(max-width: 767px)").matches,
+  );
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 767px)");
+    const resize = () => {
+      setMobile(media.matches);
+      setDrawerOpen(false);
+    };
+    media.addEventListener("change", resize);
+    return () => media.removeEventListener("change", resize);
+  }, []);
+  useLayoutEffect(() => {
+    const dialog = drawer.current;
+    if (mobile && drawerOpen) dialog?.showModal();
+    return () => dialog?.close();
+  }, [mobile, drawerOpen]);
   const [identityOpen, setIdentityOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [dmPickerOpen, setDmPickerOpen] = useState(false);
@@ -122,14 +149,9 @@ export function CommunityShell({
     (c) => c.kind === "channel" && c.id !== announcementChannel?.id,
   );
   const pinned = preferences.key === preferenceKey ? preferences.pinned : [];
-  const sidebarChannels = [...regularChannels]
-    .sort(
-      (a, b) => Number(pinned.includes(b.id)) - Number(pinned.includes(a.id)),
-    )
-    .filter(
-      (channel, index) =>
-        index < 6 || pinned.includes(channel.id) || channel.id === activeId,
-    );
+  const sidebarChannels = [...regularChannels].sort(
+    (a, b) => Number(pinned.includes(b.id)) - Number(pinned.includes(a.id)),
+  );
   const lastChannel = channels.find(
     (channel) => channel.id === (activeId ?? preferences.last),
   )?.id;
@@ -159,343 +181,317 @@ export function CommunityShell({
     window.addEventListener("keydown", dismiss);
     return () => window.removeEventListener("keydown", dismiss);
   }, []);
-  function selectChannel(id: string) {
+  function selectChannel(id: string, eventId?: string) {
     setDrawerOpen(false);
-    if (onSelectChannel) onSelectChannel(id);
-    else void navigate({ to: "/chat", search: { channel: id } });
+    if (onSelectChannel) onSelectChannel(id, eventId);
+    else
+      void navigate({ to: "/chat", search: { channel: id, event: eventId } });
   }
   function openRoom(room: string) {
     if (onOpenRoom) onOpenRoom(room);
     else void navigate({ to: "/chat", search: { room } });
   }
-  return (
-    <div className="hive-app hive-chat">
-      {drawerOpen ? (
-        <button
-          type="button"
-          aria-label="Close channel list"
-          onClick={() => setDrawerOpen(false)}
-          className="fixed inset-0 z-30 bg-black/60 md:hidden"
-        />
-      ) : null}
-
-      <aside
-        id="channel-navigation"
-        data-open={drawerOpen}
-        className={cn(
-          "hive-sidebar hive-chat-sidebar z-40",
-          "max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:transition-transform",
-          drawerOpen ? "max-md:translate-x-0" : "max-md:-translate-x-full",
-        )}
+  const sidebar = (
+    <aside
+      id="channel-navigation"
+      data-open={drawerOpen}
+      className={cn("hive-sidebar hive-chat-sidebar z-40")}
+    >
+      <HiveBrand
+        channel={lastChannel}
+        onNavigate={() => setDrawerOpen(false)}
+      />
+      <ConnectionPill />
+      <button
+        type="button"
+        className="hive-chat-search"
+        onClick={() => setSearchOpen(true)}
       >
-        <HiveBrand
-          channel={lastChannel}
+        <Search size={16} aria-hidden="true" />
+        <span>Search the Hive</span>
+        <span className="hive-search-shortcut" aria-hidden="true">
+          ⌘K
+        </span>
+      </button>
+      <div className="hive-sidebar-scroll">
+        <SurfacesNav
+          inboxUnread={inboxUnread}
           onNavigate={() => setDrawerOpen(false)}
-        />
-        <ConnectionPill />
-        <button
-          type="button"
-          className="hive-chat-search"
-          onClick={() => setSearchOpen(true)}
         >
-          <Search size={16} aria-hidden="true" />
-          <span>Search the Hive</span>
-          <span className="hive-search-shortcut" aria-hidden="true">
-            ⌘K
-          </span>
-        </button>
-        <div className="hive-sidebar-scroll">
-          <SurfacesNav
-            inboxUnread={inboxUnread}
-            onNavigate={() => setDrawerOpen(false)}
+          <button
+            type="button"
+            className="hive-nav-link hive-announcements-link"
+            aria-label="Announcements"
+            aria-current={
+              announcementsOpen ||
+              (!!announcementChannel && activeId === announcementChannel.id)
+                ? "page"
+                : undefined
+            }
+            onClick={() => {
+              setDrawerOpen(false);
+              void navigate({
+                to: "/chat",
+                search: { view: "announcements" },
+              });
+            }}
           >
-            <button
-              type="button"
-              className="hive-nav-link hive-announcements-link"
-              aria-label="Announcements"
-              aria-current={
-                announcementsOpen ||
-                (!!announcementChannel && activeId === announcementChannel.id)
-                  ? "page"
-                  : undefined
-              }
-              onClick={() => {
-                setDrawerOpen(false);
-                void navigate({
-                  to: "/chat",
-                  search: { view: "announcements" },
-                });
-              }}
-            >
-              <Megaphone size={17} aria-hidden="true" />
-              <span>Announcements</span>
-              {announcementChannel &&
-                (unread.get(announcementChannel.id) ?? 0) > 0 && (
-                  <span className="hive-unread">
-                    {unread.get(announcementChannel.id)}
-                  </span>
-                )}
-            </button>
-          </SurfacesNav>
-          <section className="hive-studio" aria-label="Studio">
-            <h2 className="hive-eyebrow">Studio</h2>
-            <Link
-              to="/live"
-              onClick={() => setDrawerOpen(false)}
-              className="hive-nav-link"
-              activeProps={{ className: "is-active", "aria-current": "page" }}
-            >
-              <Radio size={17} aria-hidden="true" />
-              <span>Live studio</span>
+            <Megaphone size={17} aria-hidden="true" />
+            <span>Announcements</span>
+            {announcementChannel &&
+              (unread.get(announcementChannel.id) ?? 0) > 0 && (
+                <span className="hive-unread">
+                  {unread.get(announcementChannel.id)}
+                </span>
+              )}
+          </button>
+        </SurfacesNav>
+        {!roster.isError &&
+          staffRole &&
+          ["owner", "admin", "moderator"].includes(staffRole) && (
+            <Link to="/manage" className="hive-nav-link">
+              Manage CreatorHive
             </Link>
-            {videoConfigured && (
-              <LiveRooms
-                selfPubkey={pubkey}
-                activeRoom={activeRoom}
-                onOpen={(room) => {
-                  openRoom(room);
-                  setDrawerOpen(false);
-                }}
-              />
-            )}
-          </section>
-          <nav
-            aria-label="Channels and direct messages"
-            className="hive-channel-list"
+          )}
+        <section className="hive-studio" aria-label="Studio">
+          <h2 className="hive-eyebrow">Studio</h2>
+          <Link
+            to="/live"
+            onClick={() => setDrawerOpen(false)}
+            className="hive-nav-link"
+            activeProps={{ className: "is-active", "aria-current": "page" }}
           >
+            <Radio size={17} aria-hidden="true" />
+            <span>Live studio</span>
+          </Link>
+          {videoConfigured && (
+            <LiveRooms
+              selfPubkey={pubkey}
+              activeRoom={activeRoom}
+              onOpen={(room) => {
+                openRoom(room);
+                setDrawerOpen(false);
+              }}
+            />
+          )}
+        </section>
+        <nav
+          aria-label="Channels and direct messages"
+          className="hive-channel-list"
+        >
+          <details open className="hive-sidebar-section">
+            <summary className="hive-section-heading">
+              <ChevronDown size={12} aria-hidden="true" />
+              Channels
+            </summary>
+            {channelsError && (
+              <p role="alert" className="px-2 py-1 text-neutral-400 text-sm">
+                {channelsError}{" "}
+                <button
+                  type="button"
+                  onClick={retryChannels}
+                  className="underline"
+                >
+                  Retry channels
+                </button>
+              </p>
+            )}
+            {channelsLoading && channels.length === 0 ? (
+              <div
+                className="hive-channel-skeleton"
+                role="status"
+                aria-label="Loading channels"
+                aria-busy="true"
+              >
+                {["75%", "55%", "65%"].map((width) => (
+                  <span
+                    key={width}
+                    className="hive-skeleton"
+                    style={{ width }}
+                    aria-hidden="true"
+                  />
+                ))}
+              </div>
+            ) : channels.length === 0 && !channelsError ? (
+              <p className="px-2 py-1 text-neutral-500 text-sm">
+                No channels available to your account yet.
+              </p>
+            ) : (
+              sidebarChannels.map((channel) => (
+                <button
+                  key={channel.id}
+                  aria-label={
+                    channel.postingPolicy === "admins"
+                      ? `Announcement channel ${channel.name}`
+                      : undefined
+                  }
+                  type="button"
+                  onClick={() => {
+                    selectChannel(channel.id);
+                  }}
+                  aria-current={channel.id === activeId ? "page" : undefined}
+                  className={cn(
+                    "w-full truncate rounded px-2 py-2.5 text-left text-sm md:py-1.5",
+                    channel.id === activeId
+                      ? "bg-neutral-800 text-neutral-50"
+                      : "text-neutral-400 hover:bg-neutral-900",
+                  )}
+                >
+                  <span className="flex items-center justify-between gap-2">
+                    <span className="truncate">
+                      {channel.postingPolicy === "admins" ? (
+                        <Megaphone
+                          size={14}
+                          className="inline mr-1"
+                          aria-hidden="true"
+                        />
+                      ) : (
+                        <span className="text-neutral-600">#</span>
+                      )}{" "}
+                      {channel.name}
+                    </span>
+                    {pinned.includes(channel.id) && (
+                      <Pin
+                        size={11}
+                        className="hive-channel-pin"
+                        aria-label="Pinned"
+                      />
+                    )}
+                    {(unread.get(channel.id) ?? 0) > 0 && (
+                      <span
+                        className="hive-unread-dot"
+                        role="img"
+                        aria-label="Unread messages"
+                      />
+                    )}
+                  </span>
+                </button>
+              ))
+            )}
+          </details>
+          <div className="hive-dm-section">
             <details open className="hive-sidebar-section">
               <summary className="hive-section-heading">
                 <ChevronDown size={12} aria-hidden="true" />
-                Channels
+                Direct messages
               </summary>
-              {channelsError && (
-                <p role="alert" className="px-2 py-1 text-neutral-400 text-sm">
-                  {channelsError}{" "}
-                  <button
-                    type="button"
-                    onClick={retryChannels}
-                    className="underline"
-                  >
-                    Retry channels
-                  </button>
+              {dmChannels.length === 0 && !channelsLoading && !channelsError ? (
+                <p className="hive-dm-empty">
+                  Start a conversation with a member.
                 </p>
-              )}
-              {channelsLoading && channels.length === 0 ? (
-                <p className="px-2 py-1 text-neutral-500 text-sm">loading…</p>
-              ) : channels.length === 0 && !channelsError ? (
-                <p className="px-2 py-1 text-neutral-500 text-sm">
-                  No channels available to your account yet.
-                </p>
-              ) : (
-                sidebarChannels.map((channel) => (
-                  <button
-                    key={channel.id}
-                    aria-label={
-                      channel.postingPolicy === "admins"
-                        ? `Announcement channel ${channel.name}`
-                        : undefined
-                    }
-                    type="button"
-                    onClick={() => {
-                      selectChannel(channel.id);
-                    }}
-                    aria-current={channel.id === activeId ? "page" : undefined}
-                    className={cn(
-                      "w-full truncate rounded px-2 py-2.5 text-left text-sm md:py-1.5",
-                      channel.id === activeId
-                        ? "bg-neutral-800 text-neutral-50"
-                        : "text-neutral-400 hover:bg-neutral-900",
-                    )}
-                  >
-                    <span className="flex items-center justify-between gap-2">
-                      <span className="truncate">
-                        {channel.postingPolicy === "admins" ? (
-                          <Megaphone
-                            size={14}
-                            className="inline mr-1"
-                            aria-hidden="true"
-                          />
-                        ) : (
-                          <span className="text-neutral-600">#</span>
-                        )}{" "}
-                        {channel.name}
-                      </span>
-                      {pinned.includes(channel.id) && (
-                        <Pin
-                          size={11}
-                          className="hive-channel-pin"
-                          aria-label="Pinned"
-                        />
-                      )}
-                      {(unread.get(channel.id) ?? 0) > 0 && (
-                        <span
-                          className="hive-unread-dot"
-                          role="img"
-                          aria-label="Unread messages"
-                        />
-                      )}
+              ) : null}
+              {dmChannels.map((channel) => (
+                <button
+                  key={channel.id}
+                  type="button"
+                  onClick={() => {
+                    selectChannel(channel.id);
+                  }}
+                  aria-current={channel.id === activeId ? "page" : undefined}
+                  className={cn(
+                    "w-full truncate rounded px-2 py-2.5 text-left text-sm md:py-1.5",
+                    channel.id === activeId
+                      ? "bg-neutral-800 text-neutral-50"
+                      : "text-neutral-400 hover:bg-neutral-900",
+                  )}
+                >
+                  <span className="flex items-center justify-between gap-2">
+                    <span className="hive-dm-name">
+                      <AvatarDisc
+                        pubkey={
+                          channel.participants.find((p) => p !== pubkey) ??
+                          pubkey
+                        }
+                        name={dmLabel(channel)}
+                        size={25}
+                      />
+                      <span className="truncate">{dmLabel(channel)}</span>
                     </span>
-                  </button>
-                ))
-              )}
+                    {(unread.get(channel.id) ?? 0) > 0 ? (
+                      <span className="shrink-0 rounded-full bg-amber-500 px-1.5 text-neutral-950 text-xs">
+                        {unread.get(channel.id)}
+                      </span>
+                    ) : null}
+                  </span>
+                </button>
+              ))}
+            </details>
+            <div className="hive-dm-heading flex items-center justify-between">
               <button
                 type="button"
-                className="hive-browse-channels"
-                onClick={() => {
-                  setChannelFilter("");
-                  setBrowseOpen(true);
-                }}
+                aria-label="New message"
+                onClick={() => setDmPickerOpen(true)}
+                className="rounded border border-neutral-700 px-1.5 text-neutral-400 text-xs hover:text-neutral-200"
               >
-                Browse channels
+                +
               </button>
-            </details>
-            <div className="hive-dm-section">
-              <details open className="hive-sidebar-section">
-                <summary className="hive-section-heading">
-                  <ChevronDown size={12} aria-hidden="true" />
-                  Direct messages
-                </summary>
-                {dmChannels.length === 0 &&
-                !channelsLoading &&
-                !channelsError ? (
-                  <p className="hive-dm-empty">
-                    Start a conversation with a member.
-                  </p>
-                ) : null}
-                {dmChannels.map((channel) => (
-                  <button
-                    key={channel.id}
-                    type="button"
-                    onClick={() => {
-                      selectChannel(channel.id);
-                    }}
-                    aria-current={channel.id === activeId ? "page" : undefined}
-                    className={cn(
-                      "w-full truncate rounded px-2 py-2.5 text-left text-sm md:py-1.5",
-                      channel.id === activeId
-                        ? "bg-neutral-800 text-neutral-50"
-                        : "text-neutral-400 hover:bg-neutral-900",
-                    )}
-                  >
-                    <span className="flex items-center justify-between gap-2">
-                      <span className="hive-dm-name">
-                        <AvatarDisc
-                          pubkey={
-                            channel.participants.find((p) => p !== pubkey) ??
-                            pubkey
-                          }
-                          name={dmLabel(channel)}
-                          size={25}
-                        />
-                        <span className="truncate">{dmLabel(channel)}</span>
-                      </span>
-                      {(unread.get(channel.id) ?? 0) > 0 ? (
-                        <span className="shrink-0 rounded-full bg-amber-500 px-1.5 text-neutral-950 text-xs">
-                          {unread.get(channel.id)}
-                        </span>
-                      ) : null}
-                    </span>
-                  </button>
-                ))}
-              </details>
-              <div className="hive-dm-heading flex items-center justify-between">
-                <button
-                  type="button"
-                  aria-label="New message"
-                  onClick={() => setDmPickerOpen(true)}
-                  className="rounded border border-neutral-700 px-1.5 text-neutral-400 text-xs hover:text-neutral-200"
-                >
-                  +
-                </button>
-              </div>
             </div>
-          </nav>
-        </div>
-        <Link
-          to="/agents"
-          className={cn(
-            "hive-nav-link hive-personal-agents",
-            path === "/workflows" && "is-active",
-          )}
-          aria-current={path === "/workflows" ? "page" : undefined}
-          activeProps={{ className: "is-active", "aria-current": "page" }}
-          onClick={() => setDrawerOpen(false)}
-        >
-          <Bot size={17} aria-hidden="true" />
-          <span>Agents</span>
-        </Link>
-        <div className="hive-sidebar-account">
-          {identity ? (
-            <button
-              type="button"
-              onClick={() => setIdentityOpen(true)}
-              className="hive-profile-button"
-            >
-              <AvatarDisc pubkey={pubkey} name={names(pubkey)} size={30} />
-              <span>
-                Your profile<small>{names(pubkey)}</small>
-              </span>
-              <Settings2 size={17} aria-hidden="true" />
-            </button>
-          ) : null}
-          <ThemeToggle />
-        </div>
-      </aside>
-
-      {browseOpen && (
-        <CommunityDialog
-          label="Browse channels"
-          description="Find a channel. Pin the ones you visit most."
-          icon={Search}
-          onClose={() => setBrowseOpen(false)}
-        >
-          <div className="hive-channel-browser">
-            <input
-              aria-label="Filter channels"
-              placeholder="Find a channel…"
-              value={channelFilter}
-              onChange={(event) => setChannelFilter(event.target.value)}
-            />
-            {regularChannels
-              .filter((channel) =>
-                channel.name
-                  .toLowerCase()
-                  .includes(channelFilter.toLowerCase()),
-              )
-              .map((channel) => (
-                <div key={channel.id}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      selectChannel(channel.id);
-                      setBrowseOpen(false);
-                    }}
-                  >
-                    # {channel.name}
-                  </button>
-                  <button
-                    type="button"
-                    aria-label={`Pin ${channel.name}`}
-                    aria-pressed={pinned.includes(channel.id)}
-                    onClick={() =>
-                      setPreferences((previous) => ({
-                        ...previous,
-                        pinned: pinned.includes(channel.id)
-                          ? pinned.filter((id) => id !== channel.id)
-                          : [...pinned, channel.id],
-                      }))
-                    }
-                  >
-                    <Pin size={16} aria-hidden="true" />
-                  </button>
-                </div>
-              ))}
-            {!regularChannels.some((channel) =>
-              channel.name.toLowerCase().includes(channelFilter.toLowerCase()),
-            ) && <p>No channels found.</p>}
           </div>
-        </CommunityDialog>
+        </nav>
+      </div>
+      <Link
+        to="/agents"
+        className={cn(
+          "hive-nav-link hive-personal-agents",
+          path === "/workflows" && "is-active",
+        )}
+        aria-current={path === "/workflows" ? "page" : undefined}
+        activeProps={{ className: "is-active", "aria-current": "page" }}
+        onClick={() => setDrawerOpen(false)}
+      >
+        <Bot size={17} aria-hidden="true" />
+        <span>Agents</span>
+      </Link>
+      <div className="hive-sidebar-account">
+        {identity ? (
+          <button
+            type="button"
+            onClick={() => setIdentityOpen(true)}
+            className="hive-profile-button"
+          >
+            <AvatarDisc pubkey={pubkey} name={names(pubkey)} size={30} />
+            <span>
+              Account<small>{names(pubkey)}</small>
+            </span>
+            <Settings2 size={17} aria-hidden="true" />
+          </button>
+        ) : null}
+        <ThemeToggle />
+      </div>
+    </aside>
+  );
+  return (
+    <div className="hive-app hive-chat">
+      {mobile ? (
+        <dialog
+          ref={drawer}
+          className="hive-navigation-dialog"
+          aria-label="Community navigation"
+          onKeyDown={(event) => {
+            if (event.key === "Escape") event.stopPropagation();
+          }}
+          onCancel={(event) => {
+            event.preventDefault();
+            setDrawerOpen(false);
+          }}
+          onClick={(event) => {
+            if (event.target === event.currentTarget) setDrawerOpen(false);
+          }}
+        >
+          {sidebar}
+          <button
+            type="button"
+            className="hive-navigation-close"
+            aria-label="Close channel list"
+            onClick={() => setDrawerOpen(false)}
+          >
+            ×
+          </button>
+        </dialog>
+      ) : (
+        sidebar
       )}
+
       {dmPickerOpen ? (
         <NewDmPicker
           selfPubkey={pubkey}

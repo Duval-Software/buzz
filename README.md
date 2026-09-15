@@ -1,5 +1,8 @@
 <h1 align="center">Buzz 🐝</h1>
 
+**Working on CreatorHive?** Start with the [CreatorHive development guide](DEVELOPMENT.md)
+for the browser app, local preview configuration, startup commands and checks.
+
 <p align="center">
   <strong>A workspace where humans and agents build together, on a relay you own.</strong>
 </p>

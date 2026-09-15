@@ -17,9 +17,7 @@ import { relayWsUrl } from "@/shared/lib/relay-url";
  * 403 instead of empty, which reads as "search is broken" rather than "be
  * specific".
  *
- * Results open the channel they live in. Jumping to the exact message needs
- * timeline positioning the client does not have yet; opening the right room
- * with the snippet fresh in mind is honest and useful today.
+ * Results retain their event id so chat can fetch and focus the exact message.
  */
 
 const KIND_CHAT = 9;
@@ -53,13 +51,14 @@ export function SearchPanel({
   onClose,
 }: {
   channels: Channel[];
-  onOpenChannel: (channelId: string) => void;
+  onOpenChannel: (channelId: string, eventId?: string) => void;
   onClose: () => void;
 }) {
   const names = useNames();
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<Hit[] | null>(null);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -76,6 +75,8 @@ export function SearchPanel({
       return;
     }
     setBusy(true);
+    setError("");
+    setHits(null);
     try {
       const events = await getSocket(relayWsUrl()).queryOnce([
         { kinds: [KIND_CHAT], search: q, limit: 30 },
@@ -85,6 +86,10 @@ export function SearchPanel({
         .filter((h): h is Hit => h !== null)
         .sort((a, b) => b.createdAt - a.createdAt);
       setHits(found);
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : "Could not search. Try again.",
+      );
     } finally {
       setBusy(false);
     }
@@ -113,12 +118,17 @@ export function SearchPanel({
             disabled={busy || query.trim().length === 0}
             className="shrink-0 rounded-lg bg-amber-500 px-3 py-2 font-semibold text-neutral-950 text-sm disabled:opacity-40"
           >
-            {busy ? "…" : "Search"}
+            {busy ? "Searching…" : error ? "Retry search" : "Search"}
           </button>
         </form>
 
-        <div className="flex-1 overflow-y-auto p-2">
-          {hits === null ? (
+        {error && (
+          <p className="mt-3 text-red-400 text-sm" role="alert">
+            {error}
+          </p>
+        )}
+        <div className="flex-1 overflow-y-auto p-2" aria-busy={busy}>
+          {error || busy ? null : hits === null ? (
             <p className="px-2 py-4 text-neutral-500 text-sm">
               Search messages across every channel you can see.
             </p>
@@ -132,7 +142,7 @@ export function SearchPanel({
                 key={hit.id}
                 type="button"
                 onClick={() => {
-                  onOpenChannel(hit.channelId);
+                  onOpenChannel(hit.channelId, hit.id);
                   onClose();
                 }}
                 className="block w-full rounded-lg px-2 py-2 text-left hover:bg-neutral-900"

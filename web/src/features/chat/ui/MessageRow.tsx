@@ -11,6 +11,7 @@ import {
 } from "@/features/chat/ui/MessageContent";
 import { useNames } from "@/features/profile/use-profiles";
 import { cn } from "@/shared/lib/cn";
+import { ReportMessage } from "@/features/moderation/ReportMessage";
 
 /** The quick-reaction set. Anything else can still arrive from other clients. */
 const QUICK_EMOJI = ["👍", "🎉", "👀", "🐝"];
@@ -92,6 +93,8 @@ export function MessageRow({
 
   return (
     <div
+      data-message-id={message.id}
+      tabIndex={-1}
       className={cn(
         "hive-message group relative",
         outgoing && !message.failed && "is-outgoing",
@@ -230,6 +233,13 @@ export function MessageRow({
               edit
             </button>
           ) : null}
+          {!mine && !message.pending && !message.failed && (
+            <ReportMessage
+              id={message.id}
+              author={message.pubkey}
+              content={message.content}
+            />
+          )}
           {mine && onDelete ? (
             confirmingDelete ? (
               <button

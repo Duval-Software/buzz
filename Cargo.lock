@@ -1226,6 +1226,7 @@ dependencies = [
  "rand 0.10.1",
  "redis",
  "reqwest 0.13.4",
+ "ring",
  "rust-s3",
  "rustls",
  "serde",
@@ -1246,6 +1247,7 @@ dependencies = [
  "tracing-subscriber",
  "url",
  "uuid",
+ "zeroize",
 ]
 
 [[package]]

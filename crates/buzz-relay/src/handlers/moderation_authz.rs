@@ -3,9 +3,8 @@
 //! One capability seam for every moderation decision, per
 //! `PLANS/COMMUNITY_MODERATION_PLAN.md` §0.1: roles are community
 //! `owner`/`admin` (from tenant-scoped `relay_members`) plus existing
-//! channel-level owner/admin. There is no Moderator tier in v1 — but all
-//! authorization routes through [`authorize_moderation_action`] so adding one
-//! later is a policy change, not a rewrite.
+//! channel-level owner/admin. Community moderators review reports and remove
+//! reported content; atomic staff commands enforce their narrower authority.
 //!
 //! ## Tenant invariant
 //! Authority never crosses the tenant fence: the actor's role is read from
@@ -64,6 +63,8 @@ pub enum ModerationAuthority {
     CommunityOwner,
     /// Actor is community `admin` in `relay_members`.
     CommunityAdmin,
+    /// Community report reviewer, without administrative powers.
+    CommunityModerator,
     /// Actor is channel owner/admin of the target's channel.
     ChannelRole,
 }
@@ -102,19 +103,31 @@ pub async fn authorize_moderation_action(
     // The target's community role is read only for the admin guard rail — i.e.
     // an admin actioning a pubkey with ban/timeout — so the owner and
     // channel-role paths stay at a single query.
-    let target_role = match (actor_role.as_deref(), action, target) {
-        (Some("admin"), ModerationAction::Ban | ModerationAction::Timeout, target) => {
-            match target {
-                ModerationTarget::Pubkey(pk) => state
-                    .db
-                    .get_relay_member(community, &hex::encode(pk))
-                    .await?
-                    .map(|m| m.role),
-                _ => None,
+    let target_key = match target {
+        ModerationTarget::Pubkey(pk) => Some(pk.to_vec()),
+        ModerationTarget::Event(id) => state
+            .db
+            .get_event_by_id_including_deleted(community, id)
+            .await?
+            .map(|event| event.event.pubkey.to_bytes().to_vec()),
+        ModerationTarget::None => None,
+    };
+    let target_role = if let Some(key) = target_key {
+        state
+            .db
+            .get_relay_member(community, &hex::encode(key))
+            .await?
+            .map(|member| member.role)
+    } else {
+        None
+    };
+    if actor_role.as_deref() == Some("moderator") && action == ModerationAction::DeleteMessage {
+        if let ModerationTarget::Event(id) = target {
+            if !state.db.staff_event_reported(community, id).await? {
+                anyhow::bail!("Report this content before removing it");
             }
         }
-        _ => None,
-    };
+    }
 
     // The channel role is read only when community authority does not apply and
     // the action is channel-local (DeleteMessage/Kick within `channel_id`).
@@ -161,12 +174,33 @@ fn decide_authority(
         // so the reachable case is an unrestricted admin lifting another admin's
         // restriction; that remains benign, audited, and owner-reversible.
         Some("admin") => {
-            if matches!(action, ModerationAction::Ban | ModerationAction::Timeout)
-                && matches!(target_role, Some("owner") | Some("admin"))
+            if matches!(
+                action,
+                ModerationAction::Ban
+                    | ModerationAction::Timeout
+                    | ModerationAction::Unban
+                    | ModerationAction::Untimeout
+                    | ModerationAction::DeleteMessage
+                    | ModerationAction::Kick
+            ) && matches!(target_role, Some("owner") | Some("admin"))
             {
                 anyhow::bail!("an admin cannot ban or time out a community owner or fellow admin");
             }
             Ok(ModerationAuthority::CommunityAdmin)
+        }
+        Some("moderator") => {
+            if !matches!(
+                action,
+                ModerationAction::DeleteMessage
+                    | ModerationAction::Timeout
+                    | ModerationAction::ResolveReport
+                    | ModerationAction::ViewQueue
+            ) || (target_role.is_some_and(|role| role != "member")
+                && !matches!(action, ModerationAction::ViewQueue))
+            {
+                anyhow::bail!("This action requires an administrator");
+            }
+            Ok(ModerationAuthority::CommunityModerator)
         }
         // Not a community owner/admin: channel owner/admin keep channel-local
         // authority for DeleteMessage/Kick only.
@@ -273,23 +307,51 @@ mod tests {
     }
 
     #[test]
-    fn admin_guard_rail_is_scoped_to_ban_and_timeout() {
-        // Reversals and non-restriction actions against an admin target are allowed —
-        // the guard rail protects against *applying* a restriction, not lifting one.
+    fn peers_are_protected_from_restrictions_and_reversals() {
         for action in [
+            ModerationAction::Ban,
+            ModerationAction::Timeout,
             ModerationAction::Unban,
             ModerationAction::Untimeout,
             ModerationAction::DeleteMessage,
             ModerationAction::Kick,
-            ModerationAction::ResolveReport,
-            ModerationAction::ViewQueue,
         ] {
+            assert!(decide_authority(Some("admin"), Some("admin"), None, action).is_err());
+        }
+        for action in [ModerationAction::ResolveReport, ModerationAction::ViewQueue] {
+            assert!(decide_authority(Some("admin"), Some("admin"), None, action).is_ok());
+        }
+    }
+
+    #[test]
+    fn moderators_have_review_authority_without_admin_powers() {
+        for action in ALL_ACTIONS {
+            let allowed = matches!(
+                action,
+                ModerationAction::DeleteMessage
+                    | ModerationAction::Timeout
+                    | ModerationAction::ResolveReport
+                    | ModerationAction::ViewQueue
+            );
             assert_eq!(
-                ok(decide_authority(Some("admin"), Some("admin"), None, action)),
-                ModerationAuthority::CommunityAdmin,
-                "admin must be authorized for {action:?} even against an admin target"
+                decide_authority(Some("moderator"), Some("member"), None, action).is_ok(),
+                allowed
             );
         }
+        assert!(decide_authority(
+            Some("moderator"),
+            Some("admin"),
+            None,
+            ModerationAction::Timeout
+        )
+        .is_err());
+        assert!(decide_authority(
+            Some("moderator"),
+            Some("moderator"),
+            Some("admin"),
+            ModerationAction::DeleteMessage
+        )
+        .is_err());
     }
 
     #[test]

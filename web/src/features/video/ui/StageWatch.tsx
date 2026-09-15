@@ -1,3 +1,4 @@
+import { useLocalMedia } from "../use-local-media";
 import {
   type LocalTrackPublication,
   type RemoteParticipant,
@@ -60,13 +61,17 @@ export function StageWatch({
     "joining",
   );
   const [error, setError] = useState<string | null>(null);
+  const {
+    camera: camOn,
+    microphone: micOn,
+    screen: screenOn,
+    pending: devicePending,
+    toggle: toggleDevice,
+  } = useLocalMedia(room, setError);
   const [tiles, setTiles] = useState<Tile[]>([]);
   const [hands, setHands] = useState<HandRaised[]>([]);
   const [handUp, setHandUp] = useState(false);
   const [canPublish, setCanPublish] = useState(false);
-  const [camOn, setCamOn] = useState(false);
-  const [micOn, setMicOn] = useState(false);
-  const [screenOn, setScreenOn] = useState(false);
   const [obsKey, setObsKey] = useState<StreamKey | null>(null);
   const [obsBusy, setObsBusy] = useState(false);
   const [obsNote, setObsNote] = useState<string | null>(null);
@@ -246,40 +251,6 @@ export function StageWatch({
         cause instanceof Error ? cause.message : "could not bring them up",
       );
     }
-  }
-
-  async function toggleCam() {
-    if (!room) {
-      return;
-    }
-    const next = !camOn;
-    await room.localParticipant.setCameraEnabled(next);
-    setCamOn(next);
-    // First camera-on brings the mic with it — that is what "turn my camera
-    // on" means to a person joining a call. After that the two are separate,
-    // so muting yourself does not kill your video.
-    if (next && !micOn) {
-      await room.localParticipant.setMicrophoneEnabled(true);
-      setMicOn(true);
-    }
-  }
-
-  async function toggleMic() {
-    if (!room) {
-      return;
-    }
-    const next = !micOn;
-    await room.localParticipant.setMicrophoneEnabled(next);
-    setMicOn(next);
-  }
-
-  async function toggleScreen() {
-    if (!room) {
-      return;
-    }
-    const next = !screenOn;
-    await room.localParticipant.setScreenShareEnabled(next);
-    setScreenOn(next);
   }
 
   async function mintObsKey(protocol: "whip" | "rtmp") {
@@ -482,7 +453,10 @@ export function StageWatch({
           <>
             <button
               type="button"
-              onClick={toggleCam}
+              onClick={() => void toggleDevice("camera")}
+              disabled={!!devicePending || status !== "live"}
+              aria-pressed={camOn}
+              aria-busy={devicePending === "camera"}
               className={
                 camOn
                   ? "rounded-lg border border-amber-600 bg-amber-950 px-3 py-1.5 text-amber-300 text-sm"
@@ -493,7 +467,10 @@ export function StageWatch({
             </button>
             <button
               type="button"
-              onClick={toggleMic}
+              onClick={() => void toggleDevice("microphone")}
+              disabled={!!devicePending || status !== "live"}
+              aria-pressed={micOn}
+              aria-busy={devicePending === "microphone"}
               className={
                 micOn
                   ? "rounded-lg border border-amber-600 bg-amber-950 px-3 py-1.5 text-amber-300 text-sm"
@@ -504,7 +481,10 @@ export function StageWatch({
             </button>
             <button
               type="button"
-              onClick={toggleScreen}
+              onClick={() => void toggleDevice("screen")}
+              disabled={!!devicePending || status !== "live"}
+              aria-pressed={screenOn}
+              aria-busy={devicePending === "screen"}
               className={
                 screenOn
                   ? "rounded-lg border border-amber-600 bg-amber-950 px-3 py-1.5 text-amber-300 text-sm"
