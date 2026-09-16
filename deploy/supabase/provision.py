@@ -45,6 +45,8 @@ def main():
         return
     if not os.environ.get("PGDATABASE") and not os.environ.get("PGSERVICE"):
         parser.error("Set a protected operator connection in PGDATABASE or PGSERVICE")
+    if psql("SELECT to_regclass('auth.users') IS NOT NULL AND to_regclass('auth.sessions') IS NOT NULL AND to_regclass('public.communities') IS NULL;").strip() != "t":
+        parser.error("Expected a Supabase target without the legacy public Buzz schema; this tool does not migrate legacy production data")
     exists = psql("select to_regclass('supabase_migrations.schema_migrations') is not null;").strip() == "t"
     applied = set(psql("select name from supabase_migrations.schema_migrations;").splitlines()) if exists else set()
     pending = [row for row in migrations if row["name"] not in applied]

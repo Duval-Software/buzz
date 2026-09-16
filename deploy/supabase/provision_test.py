@@ -56,6 +56,13 @@ CREATE FUNCTION auth.jwt() RETURNS jsonb LANGUAGE sql AS $$ SELECT '{}'::jsonb $
             pass
     assert sql("SELECT to_regclass('buzz.must_rollback') IS NULL;").strip() == "t"
     assert sql("SELECT count(*) FROM supabase_migrations.schema_migrations WHERE name='deliberately_failed_setup';").strip() == "0"
-    print("Fresh setup, idempotent rerun, checksum rejection and failed-migration rollback passed.")
+    sql("CREATE TABLE public.communities(id uuid);")
+    with patch.object(provision, "psql", sql), patch.dict(os.environ, {"PGDATABASE": "fixture"}), patch.object(sys, "argv", ["provision.py", "--apply"]), contextlib.redirect_stderr(io.StringIO()):
+        try:
+            provision.main()
+            raise AssertionError("Legacy production target accepted")
+        except SystemExit as error:
+            assert error.code == 2
+    print("Fresh setup, idempotent rerun, checksum rejection, transaction rollback and legacy-target refusal passed.")
 finally:
     subprocess.run(["docker", "rm", "-f", name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

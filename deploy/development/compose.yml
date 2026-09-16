@@ -12,8 +12,8 @@ services:
       RELAY_URL: wss://api-dev.creatorhive.ai
       BUZZ_MANAGED_RELAY_URL: wss://api-dev.creatorhive.ai
       BUZZ_MEDIA_BASE_URL: https://api-dev.creatorhive.ai/media
-      BUZZ_MANAGED_HTTP_ORIGINS: https://api-dev.creatorhive.ai,https://dev.creatorhive.ai,http://localhost:5173
-      BUZZ_CORS_ORIGINS: https://dev.creatorhive.ai,http://localhost:5173
+      BUZZ_MANAGED_HTTP_ORIGINS: https://api-dev.creatorhive.ai,https://dev.creatorhive.ai,http://localhost:5173,https://review.creatorhive-app-preview.pages.dev
+      BUZZ_CORS_ORIGINS: https://dev.creatorhive.ai,http://localhost:5173,https://review.creatorhive-app-preview.pages.dev
       BUZZ_WEB_DIR: /srv/creatorhive-release
     ports: !override
       - "127.0.0.1:3300:3000"
@@ -48,7 +48,7 @@ services:
       AK_RELAY_HTTP: https://api-dev.creatorhive.ai
       AK_RELAY_WS: wss://api-dev.creatorhive.ai
       CH_SESSION_VALIDATION_URL: https://api-dev.creatorhive.ai/api/identity/session
-      AK_PUBLIC_URLS: https://api-dev.creatorhive.ai,https://dev.creatorhive.ai,http://localhost:5173
+      AK_PUBLIC_URLS: https://api-dev.creatorhive.ai,https://dev.creatorhive.ai,http://localhost:5173,https://review.creatorhive-app-preview.pages.dev
       SSL_CERT_FILE: ""
     volumes:
       - ./releases/${RELEASE_ID}/agentkeeper:/usr/local/bin/agentkeeper:ro

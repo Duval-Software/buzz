@@ -9,6 +9,10 @@
 deploys frontend inputs from this branch. Its watched paths are `web/*`,
 `deploy/cloudflare/*`, root package/lock/workspace files and `patches/*`.
 
+The integration branch requires the `CreatorHive Checks` result and resolved PR
+conversations, and blocks ordinary force pushes/deletion. Repository admins retain
+GitHub's bypass for maintenance; normal feature work goes through a PR.
+
 The CreatorHive workflow builds, checks and packages backend changes on Linux.
 After checks pass, its `development` environment streams the immutable artifact
 to the existing dev server. Deployments are serialized by GitHub and a server
@@ -23,7 +27,9 @@ lock. A failed readiness check automatically restores the prior release.
 - The SHA-256 of the reviewed development Compose configuration.
 - Build time, previous release, binary checksums and an immutable release directory.
 
-The runtime base is pinned by image ID in the protected `runtime.env`. Release
+Each release retains its Compose configuration and runtime image pin, so rollback
+restores the matching configuration too. The runtime base is pinned by image ID
+in the protected `runtime.env`. Release
 artifacts remain in GitHub Actions for 90 days and on the server until an operator
 archives them. The baseline preserves the original binaries; its source revisions
 are explicitly marked unrecorded. A release does not run database migrations.
@@ -84,6 +90,11 @@ published SQL or checksums. Regenerate the SQLx verifier with
 Production still uses the older app, relay and database. Promoting the frontend
 alone would strand existing accounts/data. Before a production cutover:
 
+Production migrations 29–31 have different meanings/checksums from this branch
+(community deletion, deletion recovery and workflow error codes). Do not run this
+branch's SQLx migration set over that database. The provisioning command refuses
+the legacy public schema; a reviewed data/identity migration is required.
+
 1. Inventory the media host's running services and signing/encryption keys with
    verified operator access; record its current frontend and backend artifacts.
 2. Take database, media, git-volume and key backups. Restore into an isolated
@@ -95,7 +106,26 @@ alone would strand existing accounts/data. Before a production cutover:
 5. Promote the tested artifacts and routing, run diagnostics and real account
    smoke checks, then reopen writes. Keep the prior environment intact until verified.
 
+An operator can copy `deploy/development/backup-production-db.sh` to the relay
+host and run it with Bash to take a private logical backup and test a full restore in a new isolated
+container. The September 16 rehearsal restored 1 community, 12 channels, 23 member
+rows and 12,485 events. The protected backup is at
+`/opt/creatorhive-backups/20260916T013934Z-DoWunj`. This proves a database restore;
+media, key recovery and an off-host backup still need their own verification.
+
 Production automation must wait for that rehearsal and verified media-host access.
-The development receiver intentionally cannot target production. Branch previews
-also remain disabled until each trusted preview has an exact callback/origin policy;
-an arbitrary Pages preview URL is not a working authenticated environment.
+The development receiver intentionally cannot target production.
+
+## Review a frontend before merging
+
+There is one prepared preview slot: branch `review`, at
+`https://review.creatorhive-app-preview.pages.dev/chat`. It uses the shared dev
+backend with exact signing/CORS origins. Before using login there, register that
+origin's `/chat` and `/chat?account=recovery` callbacks in Supabase Auth, then run
+`pnpm doctor --review`. Other branches do not deploy. No wildcard callbacks are needed.
+
+After checking a feature branch, publish its committed frontend with
+`git push origin HEAD:review`. If the existing review belongs to a different,
+unmerged feature, coordinate who owns this single slot before replacing it.
+Check its `/build-info.json` commit before sharing the URL. Backend changes still
+deploy only from `creatorhive-web`; this preview does not create a separate database.

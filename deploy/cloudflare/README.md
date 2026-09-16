@@ -25,7 +25,8 @@ For an operator-only service restart:
 
 ```sh
 cd /opt/creatorhive-preview
-docker compose --env-file .env --env-file runtime.env --env-file release.env -f compose.yml -f development.compose.yml up -d --no-deps relay agentkeeper cloudflared
+. ./release.env
+docker compose --project-directory "$PWD" --env-file .env --env-file "releases/$RELEASE_ID/runtime.env" --env-file release.env -f compose.yml -f "releases/$RELEASE_ID/compose.yml" up -d --no-deps relay agentkeeper cloudflared
 ```
 
 The remote-managed tunnel token lives only in `/opt/creatorhive-preview/cloudflared.token`,

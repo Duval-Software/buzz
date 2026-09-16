@@ -44,10 +44,20 @@ async function main() {
   const branch = execFileSync("git", ["branch", "--show-current"], { cwd: root, encoding: "utf8" }).trim();
   const commit = execFileSync("git", ["rev-parse", "--short", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
   console.log(`Local source: ${branch} ${commit}; backend: ${api}`);
+  const origins = ["https://dev.creatorhive.ai", "http://localhost:5173"];
+  if (process.argv.includes("--review")) origins.push("https://review.creatorhive-app-preview.pages.dev");
   const checks = [
     ...[["/health", 200], ["/keeper/health", 200], ["/keeper/agents", 401]].map(([path, status]) => [path, async () => assert.equal((await request(`${api}${path}`)).status, status)]),
     ["Managed account protection", async () => assert.equal((await request(`${api}/api/identity/bootstrap`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })).status, 401)],
-    ...["https://dev.creatorhive.ai", "http://localhost:5173"].flatMap(origin => ["/chat", "/chat?account=recovery"].map(path => [origin + path, () => checkAuthRedirect(origin + path, config)])),
+    ...origins.flatMap(origin => ["/chat", "/chat?account=recovery"].map(path => [origin + path, () => checkAuthRedirect(origin + path, config)])),
+    ["Allowed browser origins", async () => {
+      for (const origin of origins) {
+        const response = await request(`${api}/health`, { headers: { Origin: origin } });
+        assert.equal(response.headers.get("access-control-allow-origin"), origin, `Backend does not allow ${origin}`);
+      }
+      const response = await request(`${api}/health`, { headers: { Origin: "https://unrelated.example" } });
+      assert.equal(response.headers.get("access-control-allow-origin"), null, "Backend unexpectedly allows an unrelated origin");
+    }],
     ["Deployed frontend version", async () => {
       const r = await request("https://dev.creatorhive.ai/build-info.json");
       assert.ok(r.ok && r.headers.get("content-type")?.includes("application/json"), "Frontend build information is missing");

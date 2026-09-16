@@ -31,7 +31,7 @@ export function HiveBrand({
           title={`Frontend ${__CREATORHIVE_BUILD__.commit} · ${__CREATORHIVE_BUILD__.backend}`}
         >
           {__CREATORHIVE_BUILD__.environment === "development"
-            ? `${import.meta.env.DEV ? "LOCAL DEV" : "SHARED DEV"} · ${__CREATORHIVE_BUILD__.commit.slice(0, 7)}`
+            ? `${import.meta.env.DEV ? "LOCAL DEV" : __CREATORHIVE_BUILD__.branch === "review" ? "REVIEW" : "SHARED DEV"} · ${__CREATORHIVE_BUILD__.commit.slice(0, 7)}`
             : "BUILD TOGETHER"}
         </small>
       </span>
