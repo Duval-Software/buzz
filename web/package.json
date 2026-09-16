@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:shared": "node scripts/dev-web.mjs",
+    "build:preview": "pnpm build --mode development && node scripts/package-preview.mjs",
     "build": "tsc && vite build",
     "typecheck": "tsc --noEmit",
     "check:file-sizes": "node ./scripts/check-file-sizes.mjs",

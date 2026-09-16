@@ -1,3 +1,58 @@
+# Shared CreatorHive development — September 15, 2026
+
+- **Review:** https://dev.creatorhive.ai/chat
+- **Code locally:** `pnpm dev:web` from the repository root after installing dependencies.
+- **Backend:** https://api-dev.creatorhive.ai (`wss://api-dev.creatorhive.ai` for chat).
+- **Git:** `Duval-Software/buzz`, branch `creatorhive-web`.
+- **Frontend:** existing Pages project `creatorhive-app-preview`; automatic branch builds use `pnpm --dir web build:preview` and the committed public `web/.env.development` settings.
+- **Relay:** existing isolated preview on creatorhive-01 (`87.99.157.94`), host loopback port 3300; keeper remains loopback 8092.
+- **Tunnel:** `creatorhive-development`, ID `30ddb751-df6a-46f1-9aff-b2e0bcd07d47`. Remote ingress sends `/keeper` paths to 8092, other API-host traffic to 3300, and unmatched hostnames to 404. The server runs the pinned connector; developers need no SSH key.
+
+`development-worker.mjs` is copied to the preview build as `_worker.js`. It proxies
+same-origin uploads and keeper requests to the development backend, preserving
+signed authorization and bodies, stripping browser cookies, and disabling API
+response caching. Static frontend files remain on Pages. It is not included in
+ordinary production builds. Run `node --test deploy/cloudflare/development-worker.test.mjs`.
+
+## Operator configuration
+
+The preview community ID remains `6ea40f06-96a3-4b49-aff1-c9495a8d0cc0`. Its host map
+is now `api-dev.creatorhive.ai`; members, messages, profiles and roles are unchanged.
+`deploy/supabase/shared-development.compose.yml` sets canonical relay/media URLs,
+exact CORS/signing origins and keeper session validation, then adds the connector.
+Merge it after the existing preview and keeper overlays:
+
+```sh
+cd /opt/creatorhive-preview
+docker compose -f compose.yml -f preview.compose.yml -f preview-keeper.compose.yml -f shared-development.compose.yml up -d --no-deps relay agentkeeper cloudflared
+```
+
+The remote-managed tunnel token lives only in `/opt/creatorhive-preview/cloudflared.token`,
+owned by UID 65532 with mode 0400, mounted read-only. It is not in Git or a frontend
+environment file. Supabase has the exact hosted callbacks
+`https://dev.creatorhive.ai/chat` and
+`https://dev.creatorhive.ai/chat?account=recovery`, in addition to the existing
+localhost callbacks. Normal Supabase sign-in and relay membership enforcement apply.
+No Cloudflare Access login is inserted in the browser/WebSocket flow.
+
+## Verify and roll back
+
+`pnpm dev:web --check` must report healthy relay and an expected unauthenticated
+401 from the managed bootstrap endpoint. Verify authenticated sign-in, channel
+loading, uploads and keeper requests after any operator change; HTTP health alone
+is insufficient. The hosted build's asset hashes must match its exact Git deployment.
+
+To undo public development routing, remove only the `api-dev` and `dev` DNS records
+and Pages custom domain, and stop the `cloudflared` service. To restore SSH-only
+preview, first restore the same community row's host to `localhost:3300`, then
+recreate relay/keeper with the original overlays and use the old local environment.
+Keep the community ID and stored data. The original production domains and
+containers are not part of this rollout.
+
+---
+
+## Historical rollout record
+
 # CreatorHive frontend deployment
 
 ## Current state — September 14, 2026

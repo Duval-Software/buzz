@@ -16,17 +16,27 @@
   },
   "build_config": {
     "root_dir": "",
-    "build_command": "corepack enable && pnpm --filter buzz-web... install --frozen-lockfile && pnpm --dir web build",
+    "build_command": "corepack enable && pnpm --filter buzz-web... install --frozen-lockfile && pnpm --dir web build:preview",
     "destination_dir": "web/dist",
     "build_caching": true
   },
   "deployment_configs": {
     "production": {
       "env_vars": {
-        "NODE_VERSION": { "type": "plain_text", "value": "22.16.0" },
-        "SKIP_DEPENDENCY_INSTALL": { "type": "plain_text", "value": "true" },
-        "VITE_MANAGED_ACCOUNTS": { "type": "plain_text", "value": "false" }
-      }
+        "NODE_VERSION": {
+          "type": "plain_text",
+          "value": "24.15.0"
+        },
+        "SKIP_DEPENDENCY_INSTALL": {
+          "type": "plain_text",
+          "value": "true"
+        },
+        "VITE_MANAGED_ACCOUNTS": {
+          "type": "plain_text",
+          "value": "true"
+        }
+      },
+      "compatibility_date": "2026-09-15"
     }
   }
 }

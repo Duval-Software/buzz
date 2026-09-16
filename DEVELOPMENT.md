@@ -39,109 +39,58 @@ Preserve existing uncommitted work. A fresh clone contains only published
 commits, so get the intended development commit from the maintainer if a
 feature described here has not been pushed yet.
 
-## 2. Configure the managed preview
+## 2. Start the shared development app
 
-Use this path for the current Google/email sign-in, onboarding, chat and
-community UI. You need access to an **isolated preview relay**, its matching
-Supabase project, and a test account. Docker is not needed on your laptop
-when those services are already running remotely.
-
-Ask the maintainer for:
-
-- The preview SSH destination and authorized SSH access, or a directly
-  reachable preview relay URL.
-- The matching Supabase project URL and **publishable** key.
-- A test account or permission to register one; Google test-user access if
-  the provider is still in testing mode.
-- Preview keeper/stage endpoints only if your work needs hosted agents or video.
-
-Create the development configuration once, without overwriting an existing file:
+From the repository root, after installing dependencies:
 
 ```sh
-test -f web/.env.development.local || cp web/.env.example web/.env.development.local
+pnpm dev:web
 ```
 
-Edit `web/.env.development.local` and replace the two Supabase placeholders.
-All `VITE_*` values are visible to browsers: use only the publishable key,
-never a service-role key, database password, SSH key or signing secret.
+Open **http://localhost:5173/chat** and sign in with Google or email. This command
+checks the shared backend, then starts Vite in development mode on port 5173.
+It uses the committed public settings in `web/.env.development`. No environment
+file, database, Docker, SSH access or tunnel is required on a developer's laptop.
 
-The template expects a relay at `ws://localhost:3300`. For the existing
-preview topology, keep this tunnel running in a separate terminal:
+The command deliberately uses the shared settings even if an old
+`web/.env.development.local` or shell environment points to the previous SSH
+preview. Stop an already-running Vite process before starting it. Do not run
+this workflow with `--mode production`.
+
+For a one-time backend check without starting Vite:
 
 ```sh
-PREVIEW_SSH_TARGET='your-user@your-preview-host'
-ssh -N -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 \
-  -L 127.0.0.1:3300:127.0.0.1:3300 "$PREVIEW_SSH_TARGET"
+pnpm dev:web --check
 ```
 
-Replace the SSH destination with the one provided by the maintainer; use
-your configured SSH identity and verified host key. Port 3300 must match
-the preview relay's remote loopback port. If you have a direct preview
-`wss://` URL instead, put it in `VITE_RELAY_URL` and skip the tunnel.
+Google accounts must be allowed by the preview's Google OAuth configuration
+while that provider is in testing. Use `localhost`, which matches the registered
+sign-in and recovery callbacks.
 
-The preview operator must configure the relay's host/community mapping,
-HTTP origins and CORS for the chosen relay URL and `http://localhost:5173`.
-Supabase must allow the exact callbacks
-`http://localhost:5173/chat` and
-`http://localhost:5173/chat?account=recovery`. A working sign-in page alone
-does not establish that the relay accepts the account.
+## 3. Review the latest shared build
 
-### Environment files and optional services
+Open **https://dev.creatorhive.ai/chat**. Pushes to `creatorhive-web` build and
+publish this development frontend through the existing Cloudflare Pages project.
+Both the hosted build and local development use **https://api-dev.creatorhive.ai**
+for the isolated preview relay, accounts, media, and hosted agents. The WebSocket
+URL is `wss://api-dev.creatorhive.ai`.
 
-| File / variable | Purpose |
-| --- | --- |
-| Root `.env` | Rust relay and Docker configuration, loaded by `just`. Not the frontend setup file. |
-| `web/.env.development.local` | Ignored local configuration for the Vite development server. |
-| `web/.env.production` | Tracked hosted-service defaults used by production-mode builds. |
-| `VITE_RELAY_URL` | WebSocket relay address; Vite derives the relay HTTP proxy target from it. |
-| `VITE_MANAGED_ACCOUNTS` | `true` enables Supabase sign-in and managed relay accounts. |
-| `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` | Public configuration for the same preview's Supabase project. |
-| `VITE_KEEPER_URL` | Optional HTTP origin for hosted agents. In managed mode, blank uses the relay as the proxy target; it does not provide a keeper service. |
-| `VITE_STAGE_URL` | Optional stagekeeper origin. Blank disables video and the legacy join bridge. |
-| `VITE_PUBLIC_PROFILES` | Enable only after the matching preview relay and profile schema are ready. |
+The existing Supabase project remains `olgskffmtievlhibuhpk`; the preview community
+and its accounts/data are preserved. Supabase's project URL and publishable key
+are public browser configuration. Server signing, database, provider, and tunnel
+credentials must never be added to any `VITE_*` setting or committed file.
 
-For the optional preview keeper, the recorded remote port is 8092. Forward
-it using another `-L 127.0.0.1:8092:127.0.0.1:8092` on the appropriate SSH
-connection and set `VITE_KEEPER_URL=http://localhost:8092`. Confirm the
-current service location with the maintainer. Stagekeeper, agentkeeper and
-LiveKit have separate service setup; starting Vite does not start them.
+A developer can customize a different backend using `web/.env.development.local`
+and the lower-level `pnpm --dir web dev` command. That workflow follows Vite's
+normal environment precedence and intentionally does not override local settings.
+`pnpm dev:web` always chooses the shared development backend.
 
-Restart Vite after changing environment files. Use `--mode development`
-for local work. `--mode production` loads hosted defaults, and a local
-frontend can still write to whichever backend its environment selects.
-Shell environment variables take precedence; `web/.env.local` also applies
-across modes, so check for stale overrides when switching setups.
+Video/stage and push delivery are not configured for this preview. Public profile
+publication remains gated off; profile drafts can be edited. Production's
+`app.creatorhive.ai` and `chat.creatorhive.ai` use their existing services.
 
-## 3. Start developing
-
-From the repository root, with the preview tunnel running:
-
-```sh
-. ./bin/activate-hermit
-pnpm --filter buzz-web dev --mode development --host localhost --port 5173
-```
-
-Open **http://localhost:5173/chat**. Use `localhost` consistently: callback,
-origin and signed-request settings can distinguish it from `127.0.0.1`.
-Sign in, complete onboarding if needed, and confirm that channels load.
-Save a frontend file to see Vite's live update. Stop Vite and the tunnel
-with Ctrl+C in their respective terminals.
-
-Useful connection checks:
-
-```sh
-curl --fail --silent --show-error http://localhost:3300/health
-curl --fail --silent --show-error http://localhost:5173/relay-info
-```
-
-For a direct remote relay, use its HTTPS health URL instead of port 3300.
-Then verify actual behavior in the browser: reload the channel, send a test
-message in the preview, and reload again to confirm persistence. Use a
-preview account/channel where test writes are expected.
-
-`just web` is a different workflow: it derives a port and relay address
-from the worktree. Use the explicit command above when working with the
-managed preview's fixed port and OAuth callbacks.
+Operator setup, routing, verification and rollback are in
+[deploy/cloudflare/README.md](deploy/cloudflare/README.md).
 
 ## 4. Find the code
 

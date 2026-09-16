@@ -3,6 +3,7 @@
   "private": true,
   "packageManager": "pnpm@11.4.0",
   "scripts": {
+    "dev:web": "pnpm --dir web dev:shared",
     "check": "pnpm -r check"
   },
   "devDependencies": {
