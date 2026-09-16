@@ -5,7 +5,7 @@
   "scripts": {
     "setup:web": "bash scripts/setup-web.sh",
     "dev:web": "pnpm --dir web dev:shared",
-    "check:web": "pnpm --dir web check && node --test scripts/development.test.mjs deploy/cloudflare/development-worker.test.mjs && node deploy/supabase/migration-manifest.mjs --check && pnpm --dir web build:preview",
+    "check:web": "pnpm --dir web check && node --test scripts/development.test.mjs scripts/check-file-sizes-core.test.mjs deploy/cloudflare/development-worker.test.mjs && node deploy/supabase/migration-manifest.mjs --check && pnpm --dir web build:preview",
     "test:web": "pnpm --dir web exec playwright test --config playwright.managed.config.ts",
     "doctor": "node scripts/doctor-web.mjs",
     "check": "pnpm -r check"

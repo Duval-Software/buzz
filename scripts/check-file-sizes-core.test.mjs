@@ -35,6 +35,9 @@ test("local base resolution uses the branch merge-base and fails without origin/
     () => resolveBaseRef(repo, {}),
     /Fetch origin\/main or set CHECK_FILE_SIZES_BASE/,
   );
+  git(repo, "remote", "set-url", "origin", "https://github.com/Duval-Software/buzz.git");
+  git(repo, "update-ref", "refs/remotes/origin/creatorhive-web", base);
+  assert.equal(resolveBaseRef(repo, {}), base);
 });
 
 test("counts empty, LF, and CRLF content with the existing semantics", () => {

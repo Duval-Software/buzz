@@ -62,9 +62,10 @@ def verify_database(manifest):
         raise ValueError("Database migration versions/checksums differ; apply reviewed migrations before deploying")
 
 
-def compose(*args):
-    run("docker", "compose", "--project-directory", str(ROOT), "--env-file", ".env", "--env-file", "runtime.env", "--env-file", "release.env",
-        "-f", "compose.yml", "-f", "development.compose.yml", *args)
+def compose(release_id, *args):
+    directory = ROOT / "releases" / release_id
+    run("docker", "compose", "--project-directory", str(ROOT), "--env-file", ".env", "--env-file", str(directory / "runtime.env"), "--env-file", "release.env",
+        "-f", "compose.yml", "-f", str(directory / "compose.yml"), *args)
 
 
 def healthy(release_id):
@@ -87,7 +88,7 @@ def healthy(release_id):
 
 def activate(release_id):
     (ROOT / "release.env").write_text(f"RELEASE_ID={release_id}\n")
-    compose("up", "-d", "--no-deps", "relay", "agentkeeper")
+    compose(release_id, "up", "-d", "--no-deps", "relay", "agentkeeper")
     for _ in range(30):
         try:
             if healthy(release_id):
@@ -129,6 +130,8 @@ def main():
                     if existing != manifest:
                         raise ValueError("Release already exists with different contents; use rollback to activate it")
                 else:
+                    shutil.copy2(ROOT / "development.compose.yml", staging / "compose.yml")
+                    shutil.copy2(ROOT / "runtime.env", staging / "runtime.env")
                     (staging / "public/assets").mkdir(parents=True)
                     shutil.copy2(staging / "release.json", staging / "public/assets/release.json")
                     (staging / "public/index.html").write_text("<!doctype html><title>CreatorHive API</title>CreatorHive development API")
@@ -137,6 +140,11 @@ def main():
             destination = ROOT / "releases" / command[1]
             manifest = json.loads((destination / "release.json").read_text())
             verify_database(manifest)
+            if hashlib.sha256((destination / "compose.yml").read_bytes()).hexdigest() != manifest["configuration"]:
+                raise ValueError("Stored release configuration has changed")
+            for binary, checksum in manifest["binaries"].items():
+                if binary not in {"buzz-relay", "agentkeeper"} or hashlib.sha256((destination / binary).read_bytes()).hexdigest() != checksum:
+                    raise ValueError("Stored release binary has changed")
         try:
             activate(manifest["id"])
         except Exception:
