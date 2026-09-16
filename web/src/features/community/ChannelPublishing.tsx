@@ -44,8 +44,8 @@ export function ChannelPublishing({
     <details className="hive-channel-publishing">
       <summary>Channel publishing</summary>
       <p>
-        Announcement channels are readable by the same audience. Only channel
-        owners and admins can publish or reply.
+        Announcement channels are readable by the same audience. Only community
+        or channel owners and admins can publish or reply.
       </p>
       {!supported ? (
         <p>
@@ -89,7 +89,7 @@ export function ChannelPublishing({
               disabled={busy}
             >
               <option value="all">Everyone with channel access</option>
-              <option value="admins">Channel owners and admins</option>
+              <option value="admins">Community and channel admins</option>
             </select>
           </label>
           <button type="submit" disabled={busy}>

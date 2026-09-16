@@ -195,7 +195,8 @@ export function ThreadPanel({
         </form>
       ) : (
         <p className="hive-announcement-note">
-          Only channel owners and admins can reply to announcements.
+          Only community or channel owners and admins can reply to
+          announcements.
         </p>
       )}
     </aside>

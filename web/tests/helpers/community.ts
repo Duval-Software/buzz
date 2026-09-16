@@ -41,6 +41,7 @@ export async function installCommunityFixture(
     closeProfileQuery?: boolean;
     rejectAuth?: boolean;
     role?: string;
+    communityRole?: string;
     policy?: "all" | "admins";
     supportsPolicy?: boolean;
     denyCommands?: boolean;
@@ -331,7 +332,7 @@ export async function installCommunityFixture(
       if (filters.some((filter) => filter.kinds?.includes(13534)))
         emit(
           event("community-roster", 13534, "", [
-            ["member", self, options.role ?? "member"],
+            ["member", self, options.communityRole ?? options.role ?? "member"],
             ["member", builder, options.role === "member" ? "owner" : "member"],
           ]),
         );

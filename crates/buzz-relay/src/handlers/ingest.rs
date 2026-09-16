@@ -955,7 +955,7 @@ fn announcement_requires_publisher(kind: u32) -> bool {
 }
 
 /// Enforce channel publishing for external events and workflow-attributed messages.
-/// Roles are read fresh from the tenant-scoped database; community roles confer no exemption.
+/// Roles are read fresh from the tenant-scoped database, including community staff.
 pub(crate) async fn check_channel_publishing(
     state: &AppState,
     community: CommunityId,
@@ -970,6 +970,17 @@ pub(crate) async fn check_channel_publishing(
     if channel.posting_policy == "all" {
         return Ok(());
     }
+    let community_role = state
+        .db
+        .get_relay_member(community, &hex::encode(author))
+        .await
+        .map_err(|_| "restricted: community publisher permissions unavailable".to_string())?
+        .map(|member| member.role);
+    if channel.posting_policy == "admins"
+        && matches!(community_role.as_deref(), Some("owner" | "admin"))
+    {
+        return Ok(());
+    }
     let members = state
         .db
         .get_members(community, channel_id)
@@ -982,7 +993,7 @@ pub(crate) async fn check_channel_publishing(
     {
         Ok(())
     } else {
-        Err("restricted: only channel owners/admins can publish announcements".into())
+        Err("restricted: only community or channel owners/admins can publish announcements".into())
     }
 }
 

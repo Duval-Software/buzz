@@ -137,7 +137,7 @@ test("announcement readers retain history and reactions without composers", asyn
   await page.getByRole("button", { name: /1 reply/ }).click();
   await expect(
     page.getByText(
-      "Only channel owners and admins can reply to announcements.",
+      "Only community or channel owners and admins can reply to announcements.",
     ),
   ).toBeVisible();
   await page.getByRole("button", { name: "Close", exact: true }).click();

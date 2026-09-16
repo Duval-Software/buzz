@@ -228,7 +228,7 @@ test("notifications describe missing configuration and announcements respect pos
     page.getByRole("heading", { name: "You’re up to date." }),
   ).toBeVisible();
   await expect(
-    page.getByText("Only channel owners and admins can post.", {
+    page.getByText("Community updates will appear here.", {
       exact: false,
     }),
   ).toBeVisible();

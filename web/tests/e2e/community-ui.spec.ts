@@ -813,3 +813,71 @@ test("manual channel retry recovers a refused request", async ({ page }) => {
     page.getByRole("textbox", { name: "Message #markdown" }),
   ).toBeVisible();
 });
+
+for (const [communityRole, forgedRoster] of [
+  ["admin", false],
+  ["owner", false],
+  ["moderator", false],
+  ["admin", true],
+] as const) {
+  test(`announcement publishing uses verified community ${communityRole} authority (forged: ${forgedRoster})`, async ({
+    page,
+  }, testInfo) => {
+    await page.emulateMedia({ colorScheme: "dark" });
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    const fixture = await installCommunityFixture(
+      page,
+      "## A new chapter for CreatorHive\n\nA home for creators to share work, meet collaborators, and build together.\n\n**This week**\n- Share what you’re working on in General\n- Meet the community and find your next collaborator",
+      {
+        role: "member",
+        communityRole,
+        forgedRoster,
+        policy: "admins",
+        channelName: "announcements",
+      },
+    );
+    await page.goto("/chat?view=announcements");
+    const composer = page.getByRole("textbox", {
+      name: "Message #announcements",
+    });
+    await expect(page.locator(".hive-announcement-card")).toHaveCount(1);
+    if (communityRole === "moderator" || forgedRoster) {
+      await expect(composer).toHaveCount(0);
+      return;
+    }
+    await expect(composer).toBeVisible();
+    await composer.fill("## Studio update");
+    await composer.press("Enter");
+    await composer.pressSequentially("Join us this Friday.");
+    await expect(composer).toHaveValue(
+      "## Studio update\nJoin us this Friday.",
+    );
+    expect(fixture.published.filter((event) => event.kind === 9)).toHaveLength(
+      0,
+    );
+    if (communityRole === "admin") {
+      await waitForAnimations(page);
+      await page.screenshot({
+        path: testInfo.outputPath("announcements-desktop.png"),
+      });
+      await page.setViewportSize({ width: 390, height: 844 });
+      await waitForAnimations(page);
+      await page.screenshot({
+        path: testInfo.outputPath("announcements-mobile.png"),
+      });
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= window.innerWidth,
+        ),
+      ).toBe(true);
+    }
+    await page.getByRole("button", { name: "Publish announcement" }).click();
+    await expect
+      .poll(() => fixture.published.filter((event) => event.kind === 9))
+      .toHaveLength(1);
+    expect(
+      fixture.published.find((event) => event.kind === 9)?.tags,
+    ).toContainEqual(["h", "markdown"]);
+    await expect(composer).toHaveValue("");
+  });
+}

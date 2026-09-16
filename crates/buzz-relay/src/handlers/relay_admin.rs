@@ -1004,7 +1004,7 @@ mod tests {
                     .err()
                     .expect("reader denied");
                 assert!(
-                    format!("{error:?}").contains("only channel owners/admins"),
+                    format!("{error:?}").contains("only community or channel owners/admins"),
                     "{kind}: {error:?}"
                 );
                 assert!(state
@@ -1065,6 +1065,48 @@ mod tests {
                     .expect("publisher post")
                     .accepted
             );
+        }
+        // Community staff can publish with an ordinary channel membership.
+        for role in ["owner", "admin", "moderator"] {
+            let staff = Keys::generate();
+            let staff_key = staff.public_key().to_bytes();
+            let staff_hex = staff.public_key().to_hex();
+            state
+                .db
+                .add_member(
+                    tenant.community(),
+                    channel.id,
+                    &staff_key,
+                    MemberRole::Member,
+                    Some(&owner_key),
+                )
+                .await
+                .expect("staff channel membership");
+            state
+                .db
+                .add_relay_member(tenant.community(), &staff_hex, role, None)
+                .await
+                .expect("staff role");
+            let result =
+                ingest_event(&state, &tenant, event(&staff, 9, vec![]), http(&staff)).await;
+            if role == "moderator" {
+                assert!(result.is_err(), "moderation must not grant publishing");
+            } else {
+                assert!(result.expect("community staff publish").accepted);
+            }
+            if role == "admin" {
+                state
+                    .db
+                    .update_relay_member_role(tenant.community(), &staff_hex, "member")
+                    .await
+                    .expect("demote staff");
+                assert!(
+                    check_channel_publishing(&state, tenant.community(), channel.id, &staff_key)
+                        .await
+                        .is_err(),
+                    "demotion must immediately revoke publishing"
+                );
+            }
         }
         state
             .db

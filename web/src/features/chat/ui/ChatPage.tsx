@@ -288,8 +288,16 @@ export function ChatPage() {
   ]);
 
   const active = channels.find((c) => c.id === activeId);
+  const isAnnouncement =
+    active?.postingPolicy === "admins" ||
+    (active != null && active.id === announcementChannel?.id);
+  const communityRole = communityMembers.data?.find(
+    (member) => member.pubkey === pubkey,
+  )?.role;
   const canPublish =
     active?.postingPolicy !== "admins" ||
+    communityRole === "owner" ||
+    communityRole === "admin" ||
     channelRole === "owner" ||
     channelRole === "admin";
   const dmLabel = (c: Channel) =>
@@ -453,7 +461,12 @@ export function ChatPage() {
       }}
     >
       {({ openChannels, openSearch, drawerOpen, totalUnread }) => (
-        <div className="hive-chat-body">
+        <div
+          className={cn(
+            "hive-chat-body",
+            isAnnouncement && "hive-announcements",
+          )}
+        >
           <main className="flex min-w-0 flex-1 flex-col">
             <header className="hive-chat-header flex items-start justify-between gap-2 border-neutral-800 border-b px-3 py-3 pt-[max(0.75rem,env(safe-area-inset-top))] md:px-5">
               <button
@@ -509,7 +522,10 @@ export function ChatPage() {
               >
                 <Search size={19} aria-hidden="true" />
               </button>
-              {active && active.kind !== "dm" && videoConfigured ? (
+              {active &&
+              active.kind !== "dm" &&
+              !isAnnouncement &&
+              videoConfigured ? (
                 <button
                   type="button"
                   aria-label={videoOpen ? "Hide video" : "Video"}
@@ -529,7 +545,7 @@ export function ChatPage() {
               ) : null}
             </header>
 
-            {!announcementsOpen && active?.kind !== "dm" && (
+            {!announcementsOpen && !isAnnouncement && active?.kind !== "dm" && (
               <CommunityWelcome />
             )}
             {active && videoOpen ? (
@@ -598,20 +614,33 @@ export function ChatPage() {
                   </div>
                 ) : messages.length === 0 ? (
                   <div className="hive-empty">
-                    <Users aria-hidden="true" />
+                    {isAnnouncement ? (
+                      <Megaphone aria-hidden="true" />
+                    ) : (
+                      <Users aria-hidden="true" />
+                    )}
                     <h3>
-                      {canPublish
-                        ? "Make yourself at home."
-                        : "You’re up to date."}
+                      {isAnnouncement
+                        ? canPublish
+                          ? "Your next update starts here."
+                          : "You’re up to date."
+                        : canPublish
+                          ? "Make yourself at home."
+                          : "You’re up to date."}
                     </h3>
                     <p>
-                      {canPublish
-                        ? "This conversation is just getting started. Share a question, an idea, or what you’re building."
-                        : "Community announcements will appear here. Only channel owners and admins can post."}
+                      {isAnnouncement
+                        ? canPublish
+                          ? "Share news, launches, and what’s coming next with the community."
+                          : "Community updates will appear here."
+                        : canPublish
+                          ? "This conversation is just getting started. Share a question, an idea, or what you’re building."
+                          : "Community announcements will appear here. Only community or channel owners and admins can post."}
                     </p>
                   </div>
                 ) : (
                   <ChatTimeline
+                    announcements={isAnnouncement}
                     messages={messages}
                     reactions={reactions}
                     pubkey={pubkey}
@@ -632,6 +661,11 @@ export function ChatPage() {
         */}
             {announcementsOpen && !active ? null : canPublish ? (
               <form onSubmit={onSend} className="hive-composer">
+                {isAnnouncement && (
+                  <div className="hive-announcement-compose-title">
+                    <Megaphone size={16} aria-hidden="true" /> New announcement
+                  </div>
+                )}
                 {typists.length > 0 ? (
                   <p className="mb-1 text-neutral-500 text-xs">
                     {typists.length === 1
@@ -731,7 +765,9 @@ export function ChatPage() {
                       <Paperclip size={19} aria-hidden="true" />
                     )}
                   </button>
-                  {recorder.status === "idle" && !draft.trim() ? (
+                  {!isAnnouncement &&
+                  recorder.status === "idle" &&
+                  !draft.trim() ? (
                     <button
                       type="button"
                       aria-label="Record a voice note"
@@ -743,7 +779,7 @@ export function ChatPage() {
                     </button>
                   ) : null}
                   <textarea
-                    rows={1}
+                    rows={isAnnouncement ? 3 : 1}
                     ref={composerRef}
                     value={draft}
                     aria-label={
@@ -757,7 +793,11 @@ export function ChatPage() {
                     onKeyDown={(event) => {
                       if (event.nativeEvent.isComposing) return;
                       if (mentionCandidates.length === 0) {
-                        if (event.key === "Enter" && !event.shiftKey) {
+                        if (
+                          event.key === "Enter" &&
+                          !event.shiftKey &&
+                          (!isAnnouncement || event.metaKey || event.ctrlKey)
+                        ) {
                           event.preventDefault();
                           event.currentTarget.form?.requestSubmit();
                         }
@@ -788,11 +828,13 @@ export function ChatPage() {
                     readOnly={sending}
                     aria-busy={sending}
                     placeholder={
-                      active
-                        ? active.kind === "dm"
-                          ? `Message ${dmLabel(active)}`
-                          : `Message #${active.name}`
-                        : "Select a channel"
+                      isAnnouncement
+                        ? "Write an update… Use ## for a heading, **bold** for emphasis."
+                        : active
+                          ? active.kind === "dm"
+                            ? `Message ${dmLabel(active)}`
+                            : `Message #${active.name}`
+                          : "Select a channel"
                     }
                     className="min-w-0 flex-1 px-3 py-2 text-base placeholder:text-neutral-600"
                   />
@@ -804,7 +846,9 @@ export function ChatPage() {
             */}
                   <button
                     type="submit"
-                    aria-label="Send"
+                    aria-label={
+                      isAnnouncement ? "Publish announcement" : "Send"
+                    }
                     disabled={
                       sending ||
                       !activeId ||
@@ -812,7 +856,7 @@ export function ChatPage() {
                     }
                     className="shrink-0 rounded-lg bg-amber-500 px-3 py-2 font-semibold text-neutral-950 text-sm disabled:opacity-40"
                   >
-                    <span>Send</span>
+                    <span>{isAnnouncement ? "Publish" : "Send"}</span>
                     <ArrowUp size={17} aria-hidden="true" />
                   </button>
                 </div>

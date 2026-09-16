@@ -51,6 +51,7 @@ function dayOf(unix: number): string {
 
 /** The channel timeline retains the existing message, attachment, reaction and thread controls. */
 export function ChatTimeline({
+  announcements = false,
   messages,
   reactions,
   pubkey,
@@ -61,6 +62,7 @@ export function ChatTimeline({
   onEdit,
   onDelete,
 }: {
+  announcements?: boolean;
   messages: ChatMessage[];
   reactions: ReactionMap;
   pubkey: string;
@@ -73,8 +75,11 @@ export function ChatTimeline({
 }) {
   const names = useNames();
   const groups = useMemo(
-    () => groupMessages(topLevelOnly(messages)),
-    [messages],
+    () =>
+      announcements
+        ? topLevelOnly(messages).map((message) => [message])
+        : groupMessages(topLevelOnly(messages)),
+    [messages, announcements],
   );
   const byId = useMemo(
     () => new Map(messages.map((m) => [m.id, m])),
@@ -85,18 +90,25 @@ export function ChatTimeline({
       {" "}
       {groups.map((group, index) => (
         <Fragment key={group[0].id}>
-          {(index === 0 ||
-            dayOf(groups[index - 1][0].createdAt) !==
-              dayOf(group[0].createdAt)) && (
-            <div className="hive-chat-date">
-              <time
-                dateTime={new Date(group[0].createdAt * 1000).toISOString()}
-              >
-                {dayOf(group[0].createdAt)}
-              </time>
-            </div>
-          )}
-          <article className="hive-message-group">
+          {!announcements &&
+            (index === 0 ||
+              dayOf(groups[index - 1][0].createdAt) !==
+                dayOf(group[0].createdAt)) && (
+              <div className="hive-chat-date">
+                <time
+                  dateTime={new Date(group[0].createdAt * 1000).toISOString()}
+                >
+                  {dayOf(group[0].createdAt)}
+                </time>
+              </div>
+            )}
+          <article
+            className={
+              announcements
+                ? "hive-message-group hive-announcement-card"
+                : "hive-message-group"
+            }
+          >
             <div className="hive-message-meta flex items-center gap-2">
               <ProfilePreview
                 pubkey={group[0].pubkey}
@@ -112,8 +124,16 @@ export function ChatTimeline({
                   {names(group[0].pubkey)}
                 </span>
               </ProfilePreview>
-              <time className="text-neutral-500 text-xs">
-                {timeOf(group[0].createdAt)}
+              {announcements && (
+                <span className="hive-announcement-badge">Announcement</span>
+              )}
+              <time
+                className="text-neutral-500 text-xs"
+                dateTime={new Date(group[0].createdAt * 1000).toISOString()}
+              >
+                {announcements
+                  ? dayOf(group[0].createdAt)
+                  : timeOf(group[0].createdAt)}
               </time>
             </div>
             {group.map((message) => (
