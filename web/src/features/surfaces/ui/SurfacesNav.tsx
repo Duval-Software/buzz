@@ -27,7 +27,13 @@ export function HiveBrand({
       />
       <span>
         Creator<span className="hive-brand-light">Hive</span>
-        <small>BUILD TOGETHER</small>
+        <small
+          title={`Frontend ${__CREATORHIVE_BUILD__.commit} · ${__CREATORHIVE_BUILD__.backend}`}
+        >
+          {__CREATORHIVE_BUILD__.environment === "development"
+            ? `${import.meta.env.DEV ? "LOCAL DEV" : "SHARED DEV"} · ${__CREATORHIVE_BUILD__.commit.slice(0, 7)}`
+            : "BUILD TOGETHER"}
+        </small>
       </span>
     </Link>
   );

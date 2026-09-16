@@ -4,8 +4,9 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     const api = /^\/(?:api|keeper|upload)(?:\/|$)/.test(url.pathname);
-    if (api || url.pathname === "/relay-info") {
-      const target = new URL(url.pathname === "/relay-info" ? "/info" : url.pathname, backend);
+    if (api || url.pathname === "/relay-info" || url.pathname === "/backend-build-info.json") {
+      const path = url.pathname === "/relay-info" ? "/info" : url.pathname === "/backend-build-info.json" ? "/assets/release.json" : url.pathname;
+      const target = new URL(path, backend);
       target.search = url.search;
       const upstream = new Request(target, request);
       upstream.headers.delete("Cookie");
@@ -21,7 +22,7 @@ export default {
     const response = await env.ASSETS.fetch(request);
     const result = new Response(response.body, response);
     result.headers.set("X-Robots-Tag", "noindex, nofollow");
-    if (response.headers.get("Content-Type")?.includes("text/html") || url.pathname === "/sw.js") {
+    if (response.headers.get("Content-Type")?.includes("text/html") || url.pathname === "/sw.js" || url.pathname === "/build-info.json") {
       result.headers.set("Cache-Control", "no-cache");
     }
     return result;

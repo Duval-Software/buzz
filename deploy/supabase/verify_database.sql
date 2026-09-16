@@ -9,15 +9,12 @@ DO $$ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_stat_ssl WHERE pid=pg_backend_pid() AND ssl) THEN
         RAISE EXCEPTION 'Database connection must use TLS';
     END IF;
-    IF (SELECT count(*) FROM _sqlx_migrations WHERE success) <> 31
-       OR (SELECT max(version) FROM _sqlx_migrations) <> 31 THEN
-        RAISE EXCEPTION 'Expected all 31 CreatorHive SQLx migrations';
-    END IF;
     IF has_schema_privilege(current_user,'buzz','CREATE')
        OR has_schema_privilege(current_user,'auth','USAGE') THEN
         RAISE EXCEPTION 'Runtime role has excessive schema privileges';
     END IF;
 END $$;
+\ir expected-migrations.sql
 SELECT current_user AS runtime_role, current_schema() AS application_schema,
        (SELECT count(*) FROM channels) AS channels,
        (SELECT count(*) FROM events) AS messages,

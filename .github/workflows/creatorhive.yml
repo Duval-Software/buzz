@@ -1,0 +1,125 @@
+name: CreatorHive
+on:
+  push:
+    branches: [creatorhive-web]
+  pull_request:
+    branches: [creatorhive-web]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+concurrency:
+  group: creatorhive-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  web:
+    name: CreatorHive Web
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: cashapp/activate-hermit@cea9af7913204a965fd488637a8d1811bba2e616
+      - run: pnpm --filter buzz-web... install --frozen-lockfile
+      - run: pnpm check:web
+      - run: python3 deploy/development/release_test.py
+      - run: python3 deploy/supabase/provision.py --export --project fixture > /dev/null
+      - run: pnpm --dir web exec playwright install --with-deps chromium
+      - run: pnpm test:web
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: failure()
+        with:
+          name: creatorhive-web-failure
+          path: web/test-results
+
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      backend: ${{ steps.paths.outputs.backend }}
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d
+        id: paths
+        with:
+          base: creatorhive-web
+          filters: |
+            backend:
+              - 'crates/**'
+              - 'migrations/**'
+              - 'schema/**'
+              - 'Cargo.*'
+              - 'rust-toolchain.toml'
+              - 'bin/**'
+              - '.cargo/**'
+              - '.github/workflows/creatorhive.yml'
+              - 'deploy/development/**'
+              - 'deploy/supabase/**'
+
+  backend:
+    name: CreatorHive Backend
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    container: rust:1.95-bookworm
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: cashapp/activate-hermit@cea9af7913204a965fd488637a8d1811bba2e616
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32
+      - run: apt-get update && apt-get install -y pkg-config libssl-dev
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy -p buzz-relay -p buzz-db -p buzz-auth --all-targets -- -D warnings
+      - run: just test-unit
+      - run: cargo build --release --locked -p buzz-relay
+      - run: node deploy/development/package-release.mjs target/release/buzz-relay release
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: creatorhive-backend-${{ github.sha }}
+          path: release.tar.gz
+          if-no-files-found: error
+          retention-days: 90
+
+  checks:
+    name: CreatorHive Checks
+    needs: [web, changes, backend]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          WEB: ${{ needs.web.result }}
+          CHANGES: ${{ needs.changes.result }}
+          BACKEND: ${{ needs.backend.result }}
+        run: test "$WEB" = success && test "$CHANGES" = success && { test "$BACKEND" = success || test "$BACKEND" = skipped; }
+
+  deploy:
+    name: Deploy shared development backend
+    needs: [checks, backend]
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/creatorhive-web' && needs.backend.result == 'success'
+    environment: development
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: creatorhive-development-deployment
+      cancel-in-progress: false
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: creatorhive-backend-${{ github.sha }}
+      - name: Deploy verified release
+        env:
+          DEPLOY_KEY: ${{ secrets.CREATORHIVE_DEV_DEPLOY_KEY }}
+          KNOWN_HOSTS: ${{ vars.CREATORHIVE_DEV_KNOWN_HOSTS }}
+          DEPLOY_HOST: ${{ vars.CREATORHIVE_DEV_HOST }}
+        run: |
+          umask 077
+          mkdir -p "$HOME/.ssh"
+          printf '%s\n' "$DEPLOY_KEY" > "$HOME/.ssh/creatorhive"
+          printf '%s\n' "$KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          ssh -i "$HOME/.ssh/creatorhive" -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes "root@$DEPLOY_HOST" deploy < release.tar.gz
+          printf 'Shared development backend: `%s`\n\n[Open app](https://dev.creatorhive.ai/chat) · [Backend release](https://api-dev.creatorhive.ai/assets/release.json)\n' "$GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
+      - name: Verify public release
+        run: |
+          curl --fail --silent --show-error "https://api-dev.creatorhive.ai/assets/release.json?commit=$GITHUB_SHA" | jq -e --arg commit "$GITHUB_SHA" '.id == $commit'

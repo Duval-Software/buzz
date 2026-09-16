@@ -20,6 +20,8 @@ try {
   assert.equal(response.headers.get("Cache-Control"), "no-store");
   await worker.fetch(new Request("https://dev.creatorhive.ai/relay-info"), {});
   assert.equal(forwarded.request.url, "https://api-dev.creatorhive.ai/info");
+  await worker.fetch(new Request("https://dev.creatorhive.ai/backend-build-info.json"), {});
+  assert.equal(forwarded.request.url, "https://api-dev.creatorhive.ai/assets/release.json");
   globalThis.fetch = async () => { throw new Error("offline"); };
   assert.equal((await worker.fetch(new Request("https://dev.creatorhive.ai/upload"), {})).status, 502);
   const page = await worker.fetch(new Request("https://dev.creatorhive.ai/chat"), { ASSETS: { fetch: async () => new Response("app", { headers: { "Content-Type": "text/html" } }) } });

@@ -18,13 +18,14 @@ ordinary production builds. Run `node --test deploy/cloudflare/development-worke
 
 The preview community ID remains `6ea40f06-96a3-4b49-aff1-c9495a8d0cc0`. Its host map
 is now `api-dev.creatorhive.ai`; members, messages, profiles and roles are unchanged.
-`deploy/supabase/shared-development.compose.yml` sets canonical relay/media URLs,
-exact CORS/signing origins and keeper session validation, then adds the connector.
-Merge it after the existing preview and keeper overlays:
+The supported runtime configuration is now `deploy/development/compose.yml`,
+merged with the base Compose file. It replaces the three historical preview
+overlays. Use the [release procedure](../development/README.md) for changes.
+For an operator-only service restart:
 
 ```sh
 cd /opt/creatorhive-preview
-docker compose -f compose.yml -f preview.compose.yml -f preview-keeper.compose.yml -f shared-development.compose.yml up -d --no-deps relay agentkeeper cloudflared
+docker compose --env-file .env --env-file runtime.env --env-file release.env -f compose.yml -f development.compose.yml up -d --no-deps relay agentkeeper cloudflared
 ```
 
 The remote-managed tunnel token lives only in `/opt/creatorhive-preview/cloudflared.token`,
@@ -37,7 +38,7 @@ No Cloudflare Access login is inserted in the browser/WebSocket flow.
 
 ## Verify and roll back
 
-`pnpm dev:web --check` must report healthy relay and an expected unauthenticated
+`pnpm doctor` must report healthy relay and an expected unauthenticated
 401 from the managed bootstrap endpoint. Verify authenticated sign-in, channel
 loading, uploads and keeper requests after any operator change; HTTP health alone
 is insufficient. The hosted build's asset hashes must match its exact Git deployment.

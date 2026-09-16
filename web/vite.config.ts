@@ -2,6 +2,7 @@ import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import { routes } from "./src/app/routes";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
+import { execFileSync } from "node:child_process";
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
@@ -15,8 +16,47 @@ export default defineConfig(({ mode }) => {
     (env.VITE_MANAGED_ACCOUNTS === "true"
       ? relayTarget
       : "https://app.creatorhive.ai");
+  const git = (...args: string[]) => {
+    try {
+      return execFileSync("git", args, {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      }).trim();
+    } catch {
+      return "unknown";
+    }
+  };
+  const buildInfo = {
+    commit:
+      process.env.CF_PAGES_COMMIT_SHA ||
+      process.env.GITHUB_SHA ||
+      git("rev-parse", "HEAD"),
+    branch: process.env.CF_PAGES_BRANCH || git("branch", "--show-current"),
+    builtAt: new Date().toISOString(),
+    environment:
+      relayTarget === "https://api-dev.creatorhive.ai" ? "development" : mode,
+    backend: relayTarget,
+  };
   return {
+    define: { __CREATORHIVE_BUILD__: JSON.stringify(buildInfo) },
     plugins: [
+      {
+        name: "creatorhive-build-info",
+        generateBundle() {
+          this.emitFile({
+            type: "asset",
+            fileName: "build-info.json",
+            source: JSON.stringify(buildInfo),
+          });
+        },
+        configureServer(server) {
+          server.middlewares.use("/build-info.json", (_request, response) => {
+            response.setHeader("Content-Type", "application/json");
+            response.setHeader("Cache-Control", "no-store");
+            response.end(JSON.stringify(buildInfo));
+          });
+        },
+      },
       tanstackRouter({
         target: "react",
         autoCodeSplitting: true,
@@ -39,6 +79,11 @@ export default defineConfig(({ mode }) => {
     server: {
       port: parseInt(process.env.VITE_PORT || "5173", 10),
       proxy: {
+        "/backend-build-info.json": {
+          target: relayTarget,
+          changeOrigin: true,
+          rewrite: () => "/assets/release.json",
+        },
         // Public capability document only. Local browser origins are not allowed
         // by the deployed relay's CORS configuration; no authenticated API is proxied here.
         "^/relay-info$": {

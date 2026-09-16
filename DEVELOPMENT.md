@@ -17,8 +17,7 @@ For a new checkout:
 git clone --branch creatorhive-web https://github.com/Duval-Software/buzz.git creatorhive
 cd creatorhive
 . ./bin/activate-hermit
-pnpm install --frozen-lockfile
-just hooks
+./scripts/setup-web.sh
 ```
 
 Hermit downloads the repository's pinned tools on demand. Activate it in
@@ -60,7 +59,7 @@ this workflow with `--mode production`.
 For a one-time backend check without starting Vite:
 
 ```sh
-pnpm dev:web --check
+pnpm doctor
 ```
 
 Google accounts must be allowed by the preview's Google OAuth configuration
@@ -120,16 +119,25 @@ conventions and required checks.
 From the repository root:
 
 ```sh
-pnpm --filter buzz-web check
-pnpm --filter buzz-web typecheck
-pnpm --filter buzz-web build
+pnpm check:web
+pnpm test:web
 git diff --check
 ```
 
-`build` produces `web/dist`; it does not publish anything. It uses production
-mode by default, so it does not load `web/.env.development.local`. For a
-locally configured artifact, use
-`pnpm --filter buzz-web build --mode development`.
+`check:web` runs lint, routing and branch-guard regression checks, migration
+manifest checks, TypeScript and the shared-dev build. `test:web` runs the managed
+account browser suite with synthetic services. Neither needs a live backend.
+`doctor` checks live services, the actual OAuth return addresses and deployed
+versions. Use `pnpm doctor --expect-commit=<full-sha>` to verify a frontend push.
+
+The sidebar/sign-in brand shows **LOCAL DEV** or **SHARED DEV** and the frontend
+commit. `/build-info.json` and `/backend-build-info.json` provide copyable version
+information. Local uncommitted edits are not represented by the commit number.
+
+Create feature branches from `creatorhive-web` and target PRs there. The CreatorHive
+workflow checks the web app and builds backend releases when backend inputs change.
+Upstream `main` remains an explicit import source. Backend release and rollback
+instructions are in [deploy/development/README.md](deploy/development/README.md).
 
 Install the browser used by tests once:
 
@@ -197,7 +205,7 @@ corresponding local setup. Do not turn off auth to bypass a setup failure.
 | Port 5173 is already in use | Inspect `lsof -nP -iTCP:5173 -sTCP:LISTEN`; reuse the right server or stop it in its own terminal. A different port needs matching callback/origin configuration. |
 | Login works, but chat never connects | Check the tunnel, relay health, `VITE_RELAY_URL`, managed account bootstrap and allowed origins. An HTTP 200 from Vite only proves the frontend is running. |
 | Google sign-in is refused or redirects elsewhere | Check test-user access, the Supabase project and exact localhost callback URLs. |
-| Wrong backend or old UI | Check the Vite mode and env overrides, restart the correct server, and reload. If assets remain stale, inspect the app's service worker/cache in DevTools. |
+| Wrong backend or old UI | Check the address first: shared dev is `dev.creatorhive.ai/chat`; `app.creatorhive.ai` is the existing production build. Compare the dev marker and run `pnpm doctor`. |
 | Unknown-host / community 404 | Check the relay's host-to-community mapping; changing `localhost` to an IP can select a different host boundary. |
 | Agents/video unavailable | Confirm the separate keeper/stage service and its preview origins; frontend startup cannot supply it. |
 | Public profiles are unavailable | Follow the profile integration runbook and verify both frontend and backend feature flags. |
