@@ -42,5 +42,5 @@ SELECT NOT EXISTS (SELECT 1 FROM differences) AND NOT EXISTS (SELECT 1 FROM _sql
 \if :migrations_match
 \else
   \echo 'Database migration versions/checksums do not match this release.'
-  \quit 1
+  DO $$ BEGIN RAISE EXCEPTION 'Migration verification failed'; END $$;
 \endif

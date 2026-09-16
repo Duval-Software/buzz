@@ -58,15 +58,15 @@ def main():
 CREATE TABLE IF NOT EXISTS supabase_migrations.schema_migrations (
 version text PRIMARY KEY, statements text[], name text);
 """
-    for index, row in enumerate(migrations):
+    for row in migrations:
         if row["name"] in applied:
             continue
         name = row["name"].replace("'", "''")
         statement = row["query"].replace("'", "''")
-        sql = f"BEGIN;\nSELECT pg_advisory_xact_lock(76190211);\n{ledger}"
+        sql = f"BEGIN;\nSET LOCAL lock_timeout='15s';\nSELECT pg_advisory_xact_lock(76190211);\n{ledger}"
         # Recheck under the lock so two operators cannot apply the same setup twice.
         sql += f"SELECT NOT EXISTS (SELECT 1 FROM supabase_migrations.schema_migrations WHERE name='{name}') AS pending \\gset\n\\if :pending\n"
-        sql += row["query"] + f"\nINSERT INTO supabase_migrations.schema_migrations(version,name,statements) VALUES ('20260916{index:06d}','{name}',ARRAY['{statement}']);\n\\endif\nCOMMIT;\n"
+        sql += row["query"] + f"\nINSERT INTO supabase_migrations.schema_migrations(version,name,statements) VALUES (to_char(clock_timestamp() AT TIME ZONE 'UTC','YYYYMMDDHH24MISSUS'),'{name}',ARRAY['{statement}']);\n\\endif\nCOMMIT;\n"
         psql(sql)
         print(f"APPLIED {row['name']}")
     print("Database setup applied. Run verify_database.sql and verify_keeper_role.sql using the actual restricted runtime connections.")

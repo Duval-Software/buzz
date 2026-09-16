@@ -19,11 +19,14 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          fetch-depth: 2
       - uses: cashapp/activate-hermit@cea9af7913204a965fd488637a8d1811bba2e616
       - run: pnpm --filter buzz-web... install --frozen-lockfile
       - run: pnpm check:web
       - run: python3 deploy/development/release_test.py
       - run: python3 deploy/supabase/provision.py --export --project fixture > /dev/null
+      - run: python3 deploy/supabase/provision_test.py
       - run: pnpm --dir web exec playwright install --with-deps chromium
       - run: pnpm test:web
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
@@ -70,6 +73,7 @@ jobs:
       - uses: cashapp/activate-hermit@cea9af7913204a965fd488637a8d1811bba2e616
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32
       - run: apt-get update && apt-get install -y pkg-config libssl-dev
+      - run: rustup component add rustfmt clippy
       - run: cargo fmt --all -- --check
       - run: cargo clippy -p buzz-relay -p buzz-db -p buzz-auth --all-targets -- -D warnings
       - run: just test-unit
