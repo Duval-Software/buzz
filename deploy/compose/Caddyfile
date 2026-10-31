@@ -31,7 +31,7 @@ import /etc/caddy/sites/*.caddy
 	}
 
 	# Team join instructions at "/" plus its logo. Exact paths only, so the
-	# relay's web client keeps /chat, /invite/*, /repos/* and friends.
+	# relay's own pages keep /invite/* (and /repos/* when the git web GUI is on).
 	@landing path / /duval.png
 	handle @landing {
 		root * /srv/landing
@@ -45,7 +45,7 @@ import /etc/caddy/sites/*.caddy
 		reverse_proxy host.docker.internal:9077
 	}
 
-	# Everything else: relay REST API, media, git, and the web client the relay
+	# Everything else: relay REST API, media, git, and the invite pages the relay
 	# serves itself from BUZZ_WEB_DIR (Buzz Relay 0.2.1 and later).
 	handle {
 		reverse_proxy relay:3000

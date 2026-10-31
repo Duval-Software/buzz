@@ -23,7 +23,8 @@ This stack's Caddy owns ports 80/443 for the whole host. Other Buzz communities 
 Compose projects with their own databases and publish nothing; they join the external Docker network
 `buzz-edge` and drop one site file into `/etc/buzz-edge/sites/` (mounted at `/etc/caddy/sites`), which the
 Caddyfile imports. Today: `placemaking.chat` from `Duval-Software/placemaking-buzz`. The relay serves its own
-web client (`BUZZ_WEB_DIR` in the 0.2.1 image), so the old `web/dist` mount and SPA fallback are gone.
+invite pages (`/invite/*`, from `BUZZ_WEB_DIR` in the 0.2.1 image), so the old `web/dist` mount and SPA
+fallback are gone. There is no general browser chat client in this build; members use the desktop app.
 
 ## Other services on the host (not in Compose)
 
@@ -43,7 +44,7 @@ docker exec buzz-prod-caddy-1 caddy validate --config /etc/caddy/Caddyfile --ada
 ```
 
 Checks: `curl -fsS -H 'Accept: application/nostr+json' https://chat.duvalsoftware.com/ | head -c 200`,
-`https://chat.duvalsoftware.com/` is the join page, `/chat` the web client.
+`https://chat.duvalsoftware.com/` is the join page, `/invite/<code>` the relay-served invite page.
 
 ## Upgrade the relay
 
