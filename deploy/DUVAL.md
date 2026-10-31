@@ -58,6 +58,13 @@ Checks: `curl -fsS -H 'Accept: application/nostr+json' https://chat.duvalsoftwar
 Roll back: previous digest in `.env` and `up -d` if no migration ran; otherwise stop the relay, `pg_restore`
 the matching dump into `buzz-prod-postgres-1`, then the previous digest. Whole host: the Hetzner snapshot.
 
+## MinIO images
+
+The pinned `minio/minio:RELEASE.2025-09-07T16-13-09Z` and `minio/mc:RELEASE.2025-08-13T08-35-41Z` are no longer
+downloadable from Docker Hub or Quay (checked 2026-10-31). Both stacks on the host run them from the local image
+cache; `docker save` tarballs live under `/opt/buzz-ops/images/` for a rebuild (`docker load -i`). Do not
+`docker image prune -a` on this host.
+
 ## Backups
 
 `buzz-backup.timer` runs `/opt/buzz-ops/backup-postgres.sh` nightly at 03:30 UTC: a `pg_dump -Fc` of every
