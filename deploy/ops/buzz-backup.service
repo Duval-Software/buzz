@@ -1,0 +1,10 @@
+[Unit]
+Description=Nightly Postgres and .env backups for every Buzz stack on this host
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/buzz-ops/backup-postgres.sh
+Nice=10
+IOSchedulingClass=idle

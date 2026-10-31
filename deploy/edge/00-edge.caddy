@@ -1,0 +1,4 @@
+# Shared edge on buzz-relay-01. Imported by the Duval chat's Caddyfile.
+# One file per community lives beside this one, installed by that community's
+# repository (for example placemaking.chat.caddy from Duval-Software/placemaking-buzz).
+# This file only guarantees the import glob matches something.

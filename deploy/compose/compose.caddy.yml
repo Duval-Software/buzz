@@ -26,13 +26,15 @@ services:
       - "${CADDY_HTTPS_PORT:-443}:443"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - ../../web/dist:/srv/app:ro
       - /opt/buzz-landing:/srv/landing:ro
+      # Site files for the other Buzz communities on this host (shared edge).
+      - /etc/buzz-edge/sites:/etc/caddy/sites:ro
       - buzz-caddy-data:/data
       - buzz-caddy-config:/config
     restart: unless-stopped
     networks:
       - buzz-net
+      - buzz-edge
 
 volumes:
   buzz-caddy-data:
@@ -41,3 +43,9 @@ volumes:
   buzz-caddy-config:
     labels:
       com.buzz.volume: caddy-config
+
+networks:
+  # Shared with the other communities' stacks. Created once on the host:
+  #   docker network create --label com.buzz.network=edge buzz-edge
+  buzz-edge:
+    external: true

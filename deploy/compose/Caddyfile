@@ -1,66 +1,62 @@
-# Canonical community URL: relay protocol + web surfaces on one hostname.
-# handle blocks are mutually exclusive and evaluated in order, so the SPA's
-# try_files rewrite never touches requests destined for the relay.
+# Duval Software chat: relay protocol + web surfaces on one hostname.
+# This Caddy is also the shared edge for every other Buzz community on this
+# host. Each community drops one site file into /etc/buzz-edge/sites on the host
+# (mounted read-only at /etc/caddy/sites) and reaches its own upstreams over the
+# external `buzz-edge` Docker network. See deploy/DUVAL.md.
+import /etc/caddy/sites/*.caddy
+
+# handle blocks are mutually exclusive and evaluated in order.
 {$BUZZ_APP_DOMAIN} {
-  encode zstd gzip
+	encode zstd gzip
 
-  # Device pairing (QR). Separate buzz-pair-relay service, which accepts the
-  # upgrade on any path. Must precede @relay_ws, which would otherwise swallow it.
-  handle /pair* {
-    reverse_proxy pair-relay:5000
-  }
+	# Device pairing (QR). Separate buzz-pair-relay service, which accepts the
+	# upgrade on any path. Must precede @relay_ws, which would otherwise swallow it.
+	handle /pair* {
+		reverse_proxy pair-relay:5000
+	}
 
-  # Nostr relay WebSocket — the workspace itself, served from "/".
-  @relay_ws {
-    header Connection *Upgrade*
-    header Upgrade    websocket
-  }
-  handle @relay_ws {
-    reverse_proxy relay:3000
-  }
+	# Nostr relay WebSocket: the workspace itself, served from "/".
+	@relay_ws {
+		header Connection *Upgrade*
+		header Upgrade websocket
+	}
+	handle @relay_ws {
+		reverse_proxy relay:3000
+	}
 
-  # NIP-11 relay info document, also on "/" via content negotiation.
-  @relay_nip11 header Accept *application/nostr+json*
-  handle @relay_nip11 {
-    reverse_proxy relay:3000
-  }
+	# NIP-11 relay info document, also on "/" via content negotiation.
+	@relay_nip11 header Accept *application/nostr+json*
+	handle @relay_nip11 {
+		reverse_proxy relay:3000
+	}
 
-  # Relay REST surface. Disjoint from the web bundle (/, /invite/*, /repos/*).
-  @relay_api path /api/* /count /deliver /events /feedback /feedback/* \
-    /git/* /health /hooks/* /info /internal/* /_liveness /media/* \
-    /_mesh /_mesh/* /moderation/* /query /_readiness /reports /reports/* \
-    /_status /upload /.well-known/*
-  handle @relay_api {
-    reverse_proxy relay:3000
-  }
+	# Team join instructions at "/" plus its logo. Exact paths only, so the
+	# relay's web client keeps /chat, /invite/*, /repos/* and friends.
+	@landing path / /duval.png
+	handle @landing {
+		root * /srv/landing
+		file_server
+	}
 
-  # Team join instructions at "/" plus its logo. Exact paths only, so the
-  # SPA keeps /invite/* and /repos/*.
-  @landing path / /duval.png
-  handle @landing {
-    root * /srv/landing
-    file_server
-  }
+	# Voice-note conversion: recorded audio in, canonical relay mp4 out.
+	# Served by the whisper sidecar on the docker host.
+	handle /voice/convert {
+		rewrite * /voicenote
+		reverse_proxy host.docker.internal:9077
+	}
 
-  # Voice-note conversion: recorded audio in, canonical relay mp4 out.
-  # Served by the whisper sidecar on the docker host.
-  handle /voice/convert {
-    rewrite * /voicenote
-    reverse_proxy host.docker.internal:9077
-  }
-
-  handle {
-    root * /srv/app
-    try_files {path} /index.html
-    file_server
-  }
+	# Everything else: relay REST API, media, git, and the web client the relay
+	# serves itself from BUZZ_WEB_DIR (Buzz Relay 0.2.1 and later).
+	handle {
+		reverse_proxy relay:3000
+	}
 }
 
 # Relay alias. Rewrites Host to the canonical name so connecting here joins the
 # same community instead of spawning a second one.
 {$BUZZ_DOMAIN} {
-  encode zstd gzip
-  reverse_proxy relay:3000 {
-    header_up Host {$BUZZ_APP_DOMAIN}
-  }
+	encode zstd gzip
+	reverse_proxy relay:3000 {
+		header_up Host {$BUZZ_APP_DOMAIN}
+	}
 }
