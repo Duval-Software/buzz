@@ -60,6 +60,7 @@
   .step p:last-child{margin-bottom:0}
 
   .btns{display:flex;flex-wrap:wrap;gap:10px;margin-top:4px}
+  .sub{font-size:12px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:var(--muted);margin:24px 0 10px}
   .btn{
     display:inline-flex;align-items:center;gap:8px;
     background:var(--teal);color:#fff;text-decoration:none;
@@ -118,7 +119,8 @@
   <section class="step">
     <div class="step-no">01 — Install the app</div>
     <h2>Download Buzz for your machine</h2>
-    <p>Buzz is a desktop app for macOS, Windows, and Linux. Pick your platform:</p>
+    <p>Buzz runs on your computer and on your phone. Pick your platform:</p>
+    <h3 class="sub">On your computer</h3>
     <div class="btns">
       <a class="btn" href="https://github.com/block/buzz/releases/download/desktop-v0.5.28/Buzz_0.5.28_aarch64.dmg">macOS · Apple Silicon</a>
       <a class="btn ghost" href="https://github.com/block/buzz/releases/download/desktop-v0.5.28/Buzz_0.5.28_x64.dmg">macOS · Intel</a>
@@ -133,6 +135,17 @@
         You only need to do this once.
       </span>
     </div>
+    <h3 class="sub">On your phone</h3>
+    <div class="btns">
+      <a class="btn ghost" href="https://apps.apple.com/us/app/buzz-chat-with-your-hive/id6779728271">iPhone · App Store</a>
+      <a class="btn ghost" href="https://play.google.com/store/apps/details?id=xyz.block.buzz.mobile">Android · Google Play</a>
+    </div>
+    <p class="small">
+      Free from Block, Inc. On Google Play, make sure the app you install says Block, Inc.
+      Already set up on your computer? Open <strong>Settings › Mobile</strong> there and follow the steps
+      on your phone, so both devices share one identity and you only need approval once.
+      Otherwise, open Buzz on your phone and paste your invite link or the address in step 2.
+    </p>
     <p class="small">Version 0.5.28 · <a href="https://github.com/block/buzz/releases/latest">See all releases</a></p>
   </section>
 
